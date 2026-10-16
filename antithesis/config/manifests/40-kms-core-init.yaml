@@ -1,0 +1,190 @@
+# The idle core-client (driver host for antithesis-workload) and the threshold-init
+# Job that creates the KMS context and epoch across the four parties.
+#
+# Rendered from chart/kms-core with:
+#   helm template kms-core-init chart/kms-core -n kms-threshold-staging --include-crds \
+#     -f ../scratchbook/k8s-minimization/values/overrides.yaml \
+#     -f ../scratchbook/k8s-minimization/values/peers.yaml \
+#     --set kmsCore.enabled=false --set kmsInit.enabled=true \
+#     --set kmsCoreClient.enabled=true --set kmsGenCertAndKeys.enabled=false
+#
+# Minimized for Antithesis, plus one upstream fix: the chart emits `imagePullPolicy`
+# twice on the core-client container (a duplicate YAML key, from the mockEnclave patch
+# adding a value-driven policy next to the stock hardcoded one). Re-serializing through
+# a YAML parser collapses it.
+#
+# The threshold-init Job is self-ordering: its init container grpc_health_probes all
+# four cores before `kms-init` runs.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app: kms-core-client
+  name: kms-core-client-config
+  namespace: kms-threshold-staging
+data:
+  load-core-client-config.sh: "#!/usr/bin/env sh\nset -e\necho \"loading configuration from env vars into the config.toml file\"\n\n# Process the S3 endpoint if it contains a variable\nif echo \"$S3_ENDPOINT\" | grep -q '\\$'; then\n    S3_ENDPOINT=$(eval echo \"$S3_ENDPOINT\")\nfi\n\nif [ -n \"${CORE_CLIENT__S3_ENDPOINT}\" ]; then\n  S3_ENDPOINT=\"${CORE_CLIENT__S3_ENDPOINT}\"\nfi\n\ncat <<EOF >>config.toml\n########################################################################\n# Config for a threshold deployment of n=4 cores with threshold t=1\n# The type of the KMS (\"centralized\" or \"threshold\")\nkms_type = \"threshold\"\n\n# The minimum number of matching responses required to have an honest majority\nnum_majority=${NUM_MAJORITY}\n\n# The minimum number of responses required to reconstruct a value (e.g. in user decryption)\nnum_reconstruct=${NUM_RECONSTRUCT}\n\n# Decryption mode used in user decryption reconstruction.\n# Options are NoiseFloodSmall and BitDecSmall.\n# Must match the deployed core/service setting!\n# Only relevant for threshold.\ndecryption_mode=${DECRYPTION_MODE}\n\n# fhe_params = \"Test\" # Small, insecure parameters for testing\nfhe_params=${FHE_PARAMETER:=Test} # Large, secure parameters\n\n# List of connection info to each of the cores\n\n    \n\n[[cores]]\n# The ID of the given KMS server (monotonically increasing positive integer starting at 1)\nparty_id = 1\n# The address of the given KMS server, including the port\naddress = \"kms-core-1-core-1:50100\"\n# The S3 endpoint where the public material of the given server can be reached\ns3_endpoint = \"${S3_ENDPOINT}\"\n# The folder at the S3 endpoint where the data is stored\nobject_folder = \"PUB-p1\"\n    \n\n[[cores]]\n# The ID of the given KMS server (monotonically increasing positive integer starting at 1)\nparty_id = 2\n# The address of the given KMS server, including the port\naddress = \"kms-core-2-core-2:50100\"\n# The S3 endpoint where the public material of the given server can be reached\ns3_endpoint = \"${S3_ENDPOINT}\"\n# The folder at the S3 endpoint where the data is stored\nobject_folder = \"PUB-p2\"\n    \n\n[[cores]]\n# The ID of the given KMS server (monotonically increasing positive integer starting at 1)\nparty_id = 3\n# The address of the given KMS server, including the port\naddress = \"kms-core-3-core-3:50100\"\n# The S3 endpoint where the public material of the given server can be reached\ns3_endpoint = \"${S3_ENDPOINT}\"\n# The folder at the S3 endpoint where the data is stored\nobject_folder = \"PUB-p3\"\n    \n\n[[cores]]\n# The ID of the given KMS server (monotonically increasing positive integer starting at 1)\nparty_id = 4\n# The address of the given KMS server, including the port\naddress = \"kms-core-4-core-4:50100\"\n# The S3 endpoint where the public material of the given server can be reached\ns3_endpoint = \"${S3_ENDPOINT}\"\n# The folder at the S3 endpoint where the data is stored\nobject_folder = \"PUB-p4\"\n    \nEOF\n\n# Keep the pod running\ntail -f /dev/null\n"
+  load-core-client-testing-config.sh: "#!/usr/bin/env sh\nset -e\n\necho \"loading configuration from env vars into the config.toml file\"\n\n# Process the S3 endpoint if it contains a variable\nif echo \"$S3_ENDPOINT\" | grep -q '\\$'; then\n    S3_ENDPOINT=$(eval echo \"$S3_ENDPOINT\")\nfi\n\nif [ -n \"${CORE_CLIENT__S3_ENDPOINT}\" ]; then\n  S3_ENDPOINT=\"${CORE_CLIENT__S3_ENDPOINT}\"\nfi\n\ncat <<EOF >>config.toml\n########################################################################\n# Config for a threshold deployment of n=4 cores with threshold t=1\n# The type of the KMS (\"centralized\" or \"threshold\")\nkms_type = \"threshold\"\n\n# The minimum number of matching responses required to have an honest majority\nnum_majority=${NUM_MAJORITY}\n\n# The minimum number of responses required to reconstruct a value (e.g. in user decryption)\nnum_reconstruct=${NUM_RECONSTRUCT}\n\n# Decryption mode used in user decryption reconstruction.\n# Options are NoiseFloodSmall and BitDecSmall.\n# Must match the deployed core/service setting!\n# Only relevant for threshold.\ndecryption_mode=${DECRYPTION_MODE}\n\n# fhe_params = \"Test\" # Small, insecure parameters for testing\nfhe_params=${FHE_PARAMETER:=Test} # Large, secure parameters\n\n# List of connection info to each of the cores\n\n    \n\n[[cores]]\n# The ID of the given KMS server (monotonically increasing positive integer starting at 1)\nparty_id = 1\n# The address of the given KMS server, including the port\naddress = \"kms-core-1-core-1:50001\"\n# The S3 endpoint where the public material of the given server can be reached\ns3_endpoint = \"${S3_ENDPOINT}\"\n# The folder at the S3 endpoint where the data is stored\nobject_folder = \"PUB-p1\"\n    \n\n[[cores]]\n# The ID of the given KMS server (monotonically increasing positive integer starting at 1)\nparty_id = 2\n# The address of the given KMS server, including the port\naddress = \"kms-core-2-core-2:50001\"\n# The S3 endpoint where the public material of the given server can be reached\ns3_endpoint = \"${S3_ENDPOINT}\"\n# The folder at the S3 endpoint where the data is stored\nobject_folder = \"PUB-p2\"\n    \n\n[[cores]]\n# The ID of the given KMS server (monotonically increasing positive integer starting at 1)\nparty_id = 3\n# The address of the given KMS server, including the port\naddress = \"kms-core-3-core-3:50001\"\n# The S3 endpoint where the public material of the given server can be reached\ns3_endpoint = \"${S3_ENDPOINT}\"\n# The folder at the S3 endpoint where the data is stored\nobject_folder = \"PUB-p3\"\n    \n\n[[cores]]\n# The ID of the given KMS server (monotonically increasing positive integer starting at 1)\nparty_id = 4\n# The address of the given KMS server, including the port\naddress = \"kms-core-4-core-4:50001\"\n# The S3 endpoint where the public material of the given server can be reached\ns3_endpoint = \"${S3_ENDPOINT}\"\n# The folder at the S3 endpoint where the data is stored\nobject_folder = \"PUB-p4\"\n    \nEOF\n"
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app: kms-core-client
+    app.kubernetes.io/name: kms-core-client
+  name: kms-core-client
+  namespace: kms-threshold-staging
+  annotations:
+    kapp.k14s.io/change-group: kms-core-client
+    kapp.k14s.io/change-rule: upsert after upserting kms-core
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kms-core-client
+  template:
+    metadata:
+      labels:
+        app: kms-core-client
+        app.kubernetes.io/name: kms-core-client
+    spec:
+      containers:
+      - name: kms-core-client
+        image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-client:local
+        imagePullPolicy: Never
+        env:
+        - name: S3_ENDPOINT
+          value: http://minio:9000/kms-public
+        - name: NUM_MAJORITY
+          value: '2'
+        - name: NUM_RECONSTRUCT
+          value: '3'
+        - name: DECRYPTION_MODE
+          value: '"NoiseFloodSmall"'
+        - name: FHE_PARAMETER
+          value: '"Test"'
+        command:
+        - /app/load-core-client-config.sh
+        volumeMounts:
+        - mountPath: /app/load-core-client-config.sh
+          subPath: load-core-client-config.sh
+          name: config
+        # The public_decrypt test template (41-kms-workload-tests.yaml). It is mounted file
+        # by file: a directory mount also puts the ConfigMap's ..data entries into the
+        # template directory, where Antithesis looks for test commands.
+        - mountPath: /opt/antithesis/test/v1/public_decrypt/helper_lib.sh
+          subPath: helper_lib.sh
+          name: workload-tests
+        - mountPath: /opt/antithesis/test/v1/public_decrypt/first_generate_key.sh
+          subPath: first_generate_key.sh
+          name: workload-tests
+        - mountPath: /opt/antithesis/test/v1/public_decrypt/parallel_driver_public_decrypt.sh
+          subPath: parallel_driver_public_decrypt.sh
+          name: workload-tests
+        - mountPath: /opt/antithesis/test/v1/public_decrypt/anytime_reshare_key.sh
+          subPath: anytime_reshare_key.sh
+          name: workload-tests
+        resources:
+          requests:
+            memory: 1Gi
+            cpu: 100m
+          limits:
+            memory: 4Gi
+            cpu: 2
+      volumes:
+      - name: config
+        configMap:
+          name: kms-core-client-config
+          defaultMode: 511
+          items:
+          - key: load-core-client-config.sh
+            path: load-core-client-config.sh
+      - name: workload-tests
+        configMap:
+          name: kms-workload-tests
+          defaultMode: 493 # 0755
+  serviceName: kms-core-client
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  labels:
+    app: kms-threshold-init-job
+    app.kubernetes.io/name: kms-core-init-threshold-init
+  annotations:
+    kapp.k14s.io/change-group: kms-init
+    kapp.k14s.io/change-rule: upsert after upserting kms-core
+  name: kms-core-init-threshold-init
+  namespace: kms-threshold-staging
+spec:
+  template:
+    metadata:
+      labels:
+        app: kms-threshold-init-job
+        app.kubernetes.io/name: kms-core-init-threshold-init
+    spec:
+      securityContext:
+        fsGroup: 10002
+        runAsGroup: 10002
+        runAsNonRoot: true
+        runAsUser: 10003
+      initContainers:
+      - name: check-kms-cores
+        image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-service-probe:local
+        command:
+        - /bin/bash
+        - -c
+        args:
+        - |
+          echo "starting init process for kms-cores to be ready to be initialized"
+          kmsInitCount=0
+          peerAddresses=("kms-core-1-core-1:50100" "kms-core-2-core-2:50100" "kms-core-3-core-3:50100" "kms-core-4-core-4:50100" )
+          for peerAddress in "${peerAddresses[@]}"; do
+            while true
+              do
+              grpc_health_probe -addr="${peerAddress}"
+              healthStatus=$?
+              if [ ${healthStatus} -eq 0 ]; then
+                echo "kms-core #${peerAddress} is already initialized"
+                kmsInitCount=$((kmsInitCount + 1))
+                break
+              fi
+              if [ ${healthStatus} -eq 1 ]; then
+                echo "kms-core #${peerAddress} is reachable but not yet initialized"
+                break
+              fi;
+              echo "failed to connect to kms-core at ${peerAddress}, retrying"
+              sleep 1
+            done
+          done
+          echo "all kms-core peers have been reached"
+          echo "${kmsInitCount}" > /mnt/kms-init-count
+        volumeMounts:
+        - name: kms-core-health
+          mountPath: /mnt
+        imagePullPolicy: Never
+      containers:
+      - name: threshold-init
+        image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-service:local
+        command:
+        - /bin/sh
+        - -c
+        args:
+        - |
+          KMS_INIT_COUNT="$(cat /mnt/kms-init-count)"
+          KMS_INIT_TIMEOUT_SECONDS=1200
+          echo "${KMS_INIT_COUNT} peers to initialize"
+          timeout ${KMS_INIT_TIMEOUT_SECONDS} bin/kms-init --addresses http://kms-core-1-core-1:50100 http://kms-core-2-core-2:50100 http://kms-core-3-core-3:50100 http://kms-core-4-core-4:50100
+          exit $?
+        volumeMounts:
+        - name: kms-core-health
+          mountPath: /mnt
+          readOnly: true
+        imagePullPolicy: Never
+      volumes:
+      - name: kms-core-health
+        emptyDir:
+          medium: Memory
+      restartPolicy: Never
+  backoffLimit: 6

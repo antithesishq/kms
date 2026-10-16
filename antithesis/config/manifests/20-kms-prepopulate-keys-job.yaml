@@ -1,0 +1,83 @@
+# Pre-populates each party's signing key and onboard CA certificate into the
+# public vault before any core starts.
+#
+# Lifted from prepopulate_keys() in deploy-threshold-k3s.sh, with the shell loop
+# unrolled for the fixed 4-party topology.
+#
+# Why this exists: with [threshold.tls.auto] the core requires a CA certificate
+# for every peer at startup. That certificate is the peer's onboard CA, written
+# by kms-gen-keys to PUB-p<i>/CACert/<SIGNING_KEY_ID>. Inside each core pod the
+# init container that *fetches* peer certificates runs before the one that
+# *writes* this party's own, so on a cold start every party waits for
+# certificates no party has produced. This Job breaks the cycle.
+---
+---
+---
+---
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kms-prepopulate-keys
+  namespace: kms-threshold-staging
+  annotations:
+    kapp.k14s.io/change-group: keys-ready
+    kapp.k14s.io/change-rule: upsert after upserting minio-ready
+spec:
+  backoffLimit: 6
+  template:
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsUser: 10003
+        runAsGroup: 10002
+        fsGroup: 10002
+        runAsNonRoot: true
+      containers:
+      - name: gen-keys
+        image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-service:local
+        imagePullPolicy: Never
+        workingDir: /tmp
+        env:
+        - name: NO_COLOR
+          value: 'true'
+        - name: RUN_MODE
+          value: dev
+        - name: RUST_LOG
+          value: info
+        - name: AWS_REGION
+          value: eu-west-1
+        - name: AWS_ACCESS_KEY_ID
+          value: kms-access-key-id
+        - name: AWS_SECRET_ACCESS_KEY
+          value: kms-secret-access-key
+        command:
+        - /bin/sh
+        - -c
+        args:
+        - |
+          set -e
+          for i in 1 2 3 4; do
+            echo "=== party $i ==="
+            printf '%s\n' \
+              '[keygen]' \
+              '' \
+              '[threshold]' \
+              "my_id = \"$i\"" \
+              "tls_subject = \"kms-core-$i-core-$i\"" \
+              '' \
+              '[aws]' \
+              'region = "eu-west-1"' \
+              's3_endpoint = "http://minio:9000"' \
+              '' \
+              '[public_vault.storage.s3]' \
+              'bucket = "kms-public"' \
+              "prefix = \"PUB-p$i\"" \
+              '' \
+              '[private_vault.storage.s3]' \
+              'bucket = "kms-private"' \
+              "prefix = \"PRIV-p$i\"" \
+              > /tmp/gen-keys-$i.toml
+            /app/kms/core/service/bin/kms-gen-keys --config-file /tmp/gen-keys-$i.toml
+          done
+          echo "PREPOPULATE_DONE"
