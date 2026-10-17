@@ -20,7 +20,9 @@
 # through the golden image (golden.Dockerfile).
 #
 # Images are tagged with the registry names the manifests reference, so
-# pushing them needs no retagging.
+# pushing them needs no retagging. The tag is the short git commit, with
+# -dirty-<yyyymmdd-hhmm> if the tree has uncommitted changes. After the binary
+# checks pass, build.sh records the tag in ../build/tag for the other scripts.
 #
 # Override any of: ENGINE (podman or docker), REG, TAG (see settings.sh).
 #=============================================================================
@@ -28,16 +30,35 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 KMS_SRC="$(cd "${HERE}/../.." && pwd)"
+
+# Set before settings.sh, which otherwise loads the tag of the last build.
+if [[ -z "${TAG:-}" ]]; then
+    TAG="$(git -C "${KMS_SRC}" rev-parse --short HEAD)" || {
+        echo "ERROR: ${KMS_SRC} is not a git checkout; set TAG." >&2
+        exit 1
+    }
+    # Two builds of one commit with different uncommitted changes must not
+    # share a tag in the registry.
+    if [[ -n "$(git -C "${KMS_SRC}" status --porcelain)" ]]; then
+        TAG="${TAG}-dirty-$(date +%Y%m%d-%H%M)"
+    fi
+fi
 . "${HERE}/settings.sh"
 
+# Nix shells export SOURCE_DATE_EPOCH=315532800 (1980-01-01), and podman uses
+# it as the creation date of every image it builds. Antithesis checks that the
+# run has an image built in the last 72 hours, so build with the real time.
+unset SOURCE_DATE_EPOCH
+
 # Intermediate images, never pushed. Fully qualified, so podman does not run
-# short-name resolution on them.
-ZAMA_GOLDEN_IMAGE="localhost/kms-antithesis/zama-golden:${TAG}"
-GOLDEN_IMAGE="localhost/kms-antithesis/rust-golden:${TAG}"
-BINARIES_IMAGE="localhost/kms-antithesis/kms-binaries:${TAG}"
-ZAMA_CORE_IMAGE="localhost/kms-antithesis/zama-core-service:${TAG}"
-ZAMA_PROBE_IMAGE="localhost/kms-antithesis/zama-core-service-probe:${TAG}"
-ZAMA_CLIENT_IMAGE="localhost/kms-antithesis/zama-core-client:${TAG}"
+# short-name resolution on them. Their tag is fixed, so each build replaces the
+# last one's and `podman image prune` can reclaim the old ones.
+ZAMA_GOLDEN_IMAGE="localhost/kms-antithesis/zama-golden:intermediate"
+GOLDEN_IMAGE="localhost/kms-antithesis/rust-golden:intermediate"
+BINARIES_IMAGE="localhost/kms-antithesis/kms-binaries:intermediate"
+ZAMA_CORE_IMAGE="localhost/kms-antithesis/zama-core-service:intermediate"
+ZAMA_PROBE_IMAGE="localhost/kms-antithesis/zama-core-service-probe:intermediate"
+ZAMA_CLIENT_IMAGE="localhost/kms-antithesis/zama-core-client:intermediate"
 
 CORE_IMAGE="${REG}/kms/core-service:${TAG}"
 PROBE_IMAGE="${REG}/kms/core-service-probe:${TAG}"
@@ -73,6 +94,7 @@ if [[ "${ENGINE}" == "docker" ]]; then
     fi
 fi
 echo "engine: ${ENGINE}"
+echo "tag: ${TAG}"
 echo "kms source: ${KMS_SRC}"
 echo "rust toolchain: ${RUST_TOOLCHAIN} (from rust-toolchain.toml)"
 
@@ -183,8 +205,12 @@ check() {  # <image> <bin dir> <binary>...
 check "${CORE_IMAGE}" /app/kms/core/service/bin kms-server kms-gen-keys kms-init
 check "${CLIENT_IMAGE}" /app/kms-core-client/bin kms-core-client
 
+mkdir -p "$(dirname "${TAG_FILE}")"
+echo "${TAG}" >"${TAG_FILE}"
+
 echo
 echo "Built:"
 for img in "${IMAGES[@]}"; do
     echo "  ${REG}/kms/${img}:${TAG}"
 done
+echo "Tag recorded in ${TAG_FILE}"

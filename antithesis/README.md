@@ -28,20 +28,34 @@ In a run, the triage report's Setup group shows whether this worked:
 
 | Target | Does |
 |---|---|
-| `build` | Builds the four images into podman |
-| `push` | Pushes them to the Antithesis registry as `:local` |
+| `build` | Builds the four images into podman, tagged with the git commit |
+| `push` | Pushes the last build to the Antithesis registry |
+| `config` | Renders `config/` into `build/config/` with the tag of the last build |
 | `driver` | Regenerates `config/manifests/41-kms-workload-tests.yaml` from `test/v1/` |
 | `k3s` | Starts local k3s |
-| `load` | Imports the images the manifests use into k3s |
-| `up` / `down` | Deploys / deletes the manifests on k3s |
+| `load` | Imports the images the manifests use into k3s (runs `config` first) |
+| `up` / `down` | Deploys / deletes the manifests on k3s (`up` runs `config` first) |
 | `test` | Runs the test commands in the client pod: keygen, driver, reshare, driver |
+
+## Image tags
+
+`make build` tags the images with the short git commit, for example `0688205e`.
+If the tree has uncommitted changes, the tag gets a `-dirty-<yyyymmdd-hhmm>` suffix, so two such builds of one commit do not share a tag.
+The build records the tag in `build/tag`, and `push`, `config` and `load` use that tag.
+Set `TAG=...` to override it for any target.
+
+The manifests in `config/manifests/` reference our images as `.../kms/<name>:@KMS_TAG@`.
+`make config` fills in the tag and writes the result to `build/config/`, which is not committed.
+Launch and deploy from `build/config/`, never from `config/`.
+
+Each build adds a new tag, so old images stay in podman and in k3s until you remove them.
 
 ## Flow
 
 Antithesis:
 
 ```
-make build push
+make build push config
 ```
 
 then launch.
@@ -56,11 +70,11 @@ make down
 
 ## Launch
 
-From this folder, after `make push` (and `make driver` if test scripts changed):
+From this folder, after `make push config` (and `make driver` before `config` if test scripts changed):
 
 ```
-snouty validate config
-snouty launch -w basic_k8s_test --config config \
+snouty validate build/config
+snouty launch -w basic_k8s_test --config build/config \
   --test-name kms-threshold \
   --description "public_decrypt workload" \
   --duration 30
@@ -70,9 +84,9 @@ snouty launch -w basic_k8s_test --config config \
 
 | You edited | Local | Antithesis |
 |---|---|---|
-| SUT code or `images/` | `make build load down up test` | `make build push`, launch |
-| `test/v1/` scripts | `make driver down up test` (or the fast path below) | `make driver`, launch |
-| `config/manifests/` | `make down up test` | launch |
+| SUT code or `images/` | `make build load down up test` | `make build push config`, launch |
+| `test/v1/` scripts | `make driver down up test` (or the fast path below) | `make driver config`, launch |
+| `config/manifests/` | `make down up test` | `make config`, launch |
 
 Fast path for test scripts, without redeploying the cores:
 

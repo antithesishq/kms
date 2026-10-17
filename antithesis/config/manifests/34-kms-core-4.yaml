@@ -105,7 +105,7 @@ spec:
         runAsUser: 10003
       subdomain: kms-core-4-core
       initContainers:
-      - image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/init-envsubst:local
+      - image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/init-envsubst:@KMS_TAG@
         imagePullPolicy: Never
         name: kms-core-init-load-env
         command:
@@ -218,7 +218,7 @@ spec:
           name: config-files
         - mountPath: /root
           name: workdir
-      - image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-service:local
+      - image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-service:@KMS_TAG@
         imagePullPolicy: Never
         name: kms-core-init-gen-keys
         securityContext:
@@ -263,7 +263,7 @@ spec:
         - mountPath: /root
           name: workdir
       containers:
-      - image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-service:local
+      - image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-service:@KMS_TAG@
         imagePullPolicy: Never
         name: kms-core
         command:

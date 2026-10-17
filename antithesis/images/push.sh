@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #=============================================================================
-# Pushes the images build.sh produced to the Antithesis registry, as the
-# :${TAG} the manifests reference.
+# Pushes the images of the last build.sh run to the Antithesis registry, under
+# the tag that build.sh recorded in ../build/tag.
 #
 #   antithesis/images/push.sh            # show what it would do
 #   antithesis/images/push.sh --push     # actually push
@@ -12,6 +12,7 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 . "${HERE}/settings.sh"
+need_tag
 
 DO_PUSH="false"
 [[ "${1:-}" == "--push" ]] && DO_PUSH="true"

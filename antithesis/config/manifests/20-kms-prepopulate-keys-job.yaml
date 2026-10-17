@@ -35,7 +35,7 @@ spec:
         runAsNonRoot: true
       containers:
       - name: gen-keys
-        image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-service:local
+        image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-service:@KMS_TAG@
         imagePullPolicy: Never
         workingDir: /tmp
         env:

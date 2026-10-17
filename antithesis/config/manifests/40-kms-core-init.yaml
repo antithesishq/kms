@@ -51,7 +51,7 @@ spec:
     spec:
       containers:
       - name: kms-core-client
-        image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-client:local
+        image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-client:@KMS_TAG@
         imagePullPolicy: Never
         env:
         - name: S3_ENDPOINT
@@ -131,7 +131,7 @@ spec:
         runAsUser: 10003
       initContainers:
       - name: check-kms-cores
-        image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-service-probe:local
+        image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-service-probe:@KMS_TAG@
         command:
         - /bin/bash
         - -c
@@ -166,7 +166,7 @@ spec:
         imagePullPolicy: Never
       containers:
       - name: threshold-init
-        image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-service:local
+        image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-service:@KMS_TAG@
         command:
         - /bin/sh
         - -c

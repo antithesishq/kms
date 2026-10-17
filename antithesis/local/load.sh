@@ -1,27 +1,30 @@
 #!/usr/bin/env bash
 #=============================================================================
-# Imports every image the manifests reference into the local k3s node.
+# Imports every image the rendered manifests (../build/config) reference into
+# the local k3s node.
 # k3s runs its own containerd and cannot see the podman (or docker) image
 # store, and every manifest uses imagePullPolicy: Never, as in Antithesis.
 #
 #   antithesis/local/load.sh
 #
-# Our images must already be built (make build). Anything else the manifests
-# reference (the MinIO images) is pulled first if it is not local yet.
+# Our images must already be built (make build) and the manifests rendered
+# (make config). Anything else the manifests reference (the MinIO images) is
+# pulled first if it is not local yet.
 #
-# Override any of: ENGINE, REG, TAG (see ../images/settings.sh), IMPORT_CMD,
+# Override any of: ENGINE, REG (see ../images/settings.sh), IMPORT_CMD,
 # LIST_CMD.
 #=============================================================================
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 . "${HERE}/../images/settings.sh"
-MANIFESTS="${HERE}/../config/manifests"
+MANIFESTS="${HERE}/../build/config/manifests"
 
 IMPORT_CMD="${IMPORT_CMD:-sudo k3s ctr images import}"
 LIST_CMD="${LIST_CMD:-sudo k3s ctr images ls -q}"
 
 command -v "${ENGINE}" >/dev/null || { echo "ERROR: ${ENGINE} not found" >&2; exit 1; }
+[[ -d "${MANIFESTS}" ]] || { echo "ERROR: ${MANIFESTS} not found; run make config first." >&2; exit 1; }
 
 images=()
 while read -r img; do images+=("${img}"); done < <(
