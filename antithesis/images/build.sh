@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 #=============================================================================
-# Builds the four images the Antithesis manifests use, from the repo's own
-# Dockerfiles, unmodified:
+# Builds the four images the Antithesis manifests use:
 #
 #   core-service        kms-server, kms-gen-keys, kms-init (insecure flavour)
 #   core-service-probe  core-service plus grpc_health_probe, for the init Job
@@ -9,6 +8,11 @@
 #   init-envsubst       the cores' config-rendering init container
 #
 #   antithesis/images/build.sh
+#
+# The KMS binaries are built with Antithesis coverage instrumentation by
+# kms-binaries.Dockerfile, a variant of docker/kms-binaries/Dockerfile. Zama's
+# core-service and core-client Dockerfiles package them, unmodified, and
+# symbols.Dockerfile adds a /symbols layer on top of each image.
 #
 # Zama's Dockerfiles start FROM images in Zama's private Chainguard org.
 # --build-context redirects each of those to the public image of the same name,
@@ -31,6 +35,9 @@ KMS_SRC="$(cd "${HERE}/../.." && pwd)"
 ZAMA_GOLDEN_IMAGE="localhost/kms-antithesis/zama-golden:${TAG}"
 GOLDEN_IMAGE="localhost/kms-antithesis/rust-golden:${TAG}"
 BINARIES_IMAGE="localhost/kms-antithesis/kms-binaries:${TAG}"
+ZAMA_CORE_IMAGE="localhost/kms-antithesis/zama-core-service:${TAG}"
+ZAMA_PROBE_IMAGE="localhost/kms-antithesis/zama-core-service-probe:${TAG}"
+ZAMA_CLIENT_IMAGE="localhost/kms-antithesis/zama-core-client:${TAG}"
 
 CORE_IMAGE="${REG}/kms/core-service:${TAG}"
 PROBE_IMAGE="${REG}/kms/core-service-probe:${TAG}"
@@ -86,16 +93,14 @@ step "golden: zama-golden + AWS_LC_SYS_NO_JITTER_ENTROPY=1"
 #--- KMS images --------------------------------------------------------------
 # The prod and dev targets below each assert that the binaries they package
 # are the insecure flavour, so a secure build cannot slip through.
-step "kms-binaries (KMS_FLAVOR=insecure)"
+step "kms-binaries (insecure, instrumented)"
 "${ENGINE}" build -t "${BINARIES_IMAGE}" \
-    -f "${KMS_SRC}/docker/kms-binaries/Dockerfile" \
-    "${ZAMA_BASES[@]}" \
+    -f "${HERE}/kms-binaries.Dockerfile" \
     --build-arg RUST_GOLDEN_IMAGE="${GOLDEN_IMAGE}" \
-    --build-arg KMS_FLAVOR=insecure \
     "${KMS_SRC}"
 
 step "core-service (prod, EXPECTED_KMS_FLAVOR=insecure)"
-"${ENGINE}" build -t "${CORE_IMAGE}" \
+"${ENGINE}" build -t "${ZAMA_CORE_IMAGE}" \
     -f "${KMS_SRC}/docker/core/service/Dockerfile" --target prod \
     "${ZAMA_BASES[@]}" \
     --build-arg RUST_GOLDEN_IMAGE="${GOLDEN_IMAGE}" \
@@ -106,7 +111,7 @@ step "core-service (prod, EXPECTED_KMS_FLAVOR=insecure)"
 # The dev target is core-service plus grpc_health_probe, which the
 # threshold-init Job uses to wait for all four cores.
 step "core-service-probe (dev, with grpc_health_probe)"
-"${ENGINE}" build -t "${PROBE_IMAGE}" \
+"${ENGINE}" build -t "${ZAMA_PROBE_IMAGE}" \
     -f "${KMS_SRC}/docker/core/service/Dockerfile" --target dev \
     "${ZAMA_BASES[@]}" \
     --build-arg RUST_GOLDEN_IMAGE="${GOLDEN_IMAGE}" \
@@ -114,35 +119,69 @@ step "core-service-probe (dev, with grpc_health_probe)"
     "${KMS_SRC}"
 
 step "core-client (prod, EXPECTED_KMS_FLAVOR=insecure)"
-"${ENGINE}" build -t "${CLIENT_IMAGE}" \
+"${ENGINE}" build -t "${ZAMA_CLIENT_IMAGE}" \
     -f "${KMS_SRC}/docker/core-client/Dockerfile" --target prod \
     "${ZAMA_BASES[@]}" \
     --build-arg KMS_BINARIES_IMAGE="${BINARIES_IMAGE}" \
     --build-arg EXPECTED_KMS_FLAVOR=insecure \
     "${KMS_SRC}"
 
+# symbols.Dockerfile on top of each, so Antithesis can symbolize coverage.
+symbols() {  # <zama image> <final image> <bin dir>
+    step "symbols: $(basename "${2%:*}")"
+    "${ENGINE}" build -t "$2" \
+        -f "${HERE}/symbols.Dockerfile" \
+        --build-arg BASE_IMAGE="$1" \
+        --build-arg BIN_DIR="$3" \
+        "${HERE}"
+}
+symbols "${ZAMA_CORE_IMAGE}" "${CORE_IMAGE}" /app/kms/core/service/bin
+symbols "${ZAMA_PROBE_IMAGE}" "${PROBE_IMAGE}" /app/kms/core/service/bin
+symbols "${ZAMA_CLIENT_IMAGE}" "${CLIENT_IMAGE}" /app/kms-core-client/bin
+
 step "init-envsubst"
 "${ENGINE}" build -t "${ENVSUBST_IMAGE}" \
     -f "${HERE}/init-envsubst/Dockerfile" \
     "${HERE}/init-envsubst"
 
-#--- Jitter-entropy check ----------------------------------------------------
-# kms-gen-keys and kms-server link AWS-LC. If its jitter entropy source was
-# compiled in, they abort() under Antithesis' deterministic clock.
-step "Checking core-service for AWS-LC jitter entropy"
+#--- Binary checks -----------------------------------------------------------
+# Byte greps, so the host needs no binutils. In each binary:
+#   jent_                         must be absent: AWS-LC's jitter entropy source
+#                                 abort()s under Antithesis' deterministic clock
+#   antithesis_load_libvoidstar   the coverage shim is linked in
+#   __sancov_guards               the code is instrumented
+#   .debug_line                   line tables for symbolization survived
+step "Checking binaries"
 tmp="$(mktemp -d)"
-cid="$("${ENGINE}" create "${CORE_IMAGE}")"
-trap '"${ENGINE}" rm -f "${cid}" >/dev/null 2>&1 || true; rm -rf "${tmp}"' EXIT
-for bin in kms-gen-keys kms-server; do
-    "${ENGINE}" cp "${cid}:/app/kms/core/service/bin/${bin}" "${tmp}/${bin}"
-    n="$(grep -c -a 'jent_' "${tmp}/${bin}" || true)"
-    if [[ "${n}" != "0" ]]; then
-        echo "ERROR: ${bin} still contains jitter entropy code (${n} matches)." >&2
-        echo "       AWS_LC_SYS_NO_JITTER_ENTROPY=1 did not reach the cargo build." >&2
-        exit 1
-    fi
-    echo "  ok: ${bin}"
-done
+cids=()
+cleanup() {
+    for c in "${cids[@]}"; do "${ENGINE}" rm -f "${c}" >/dev/null 2>&1 || true; done
+    rm -rf "${tmp}"
+}
+trap cleanup EXIT
+check() {  # <image> <bin dir> <binary>...
+    local image="$1" dir="$2" cid bin s
+    shift 2
+    cid="$("${ENGINE}" create "${image}")"
+    cids+=("${cid}")
+    for bin in "$@"; do
+        "${ENGINE}" cp "${cid}:${dir}/${bin}" "${tmp}/${bin}"
+        if grep -q -a -F 'jent_' "${tmp}/${bin}"; then
+            echo "ERROR: ${bin} still contains jitter entropy code." >&2
+            echo "       AWS_LC_SYS_NO_JITTER_ENTROPY=1 did not reach the cargo build." >&2
+            exit 1
+        fi
+        for s in antithesis_load_libvoidstar __sancov_guards .debug_line; do
+            if ! grep -q -a -F "${s}" "${tmp}/${bin}"; then
+                echo "ERROR: ${bin} has no ${s}; see 'Binary checks' in build.sh." >&2
+                exit 1
+            fi
+        done
+        echo "  ok: ${bin}"
+    done
+}
+check "${CORE_IMAGE}" /app/kms/core/service/bin kms-server kms-gen-keys kms-init
+check "${CLIENT_IMAGE}" /app/kms-core-client/bin kms-core-client
 
 echo
 echo "Built:"

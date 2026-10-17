@@ -39,6 +39,13 @@ typed-builder.workspace = true
 uuid.workspace = true
 validator.workspace = true
 
+# Coverage instrumentation for Antithesis builds, which pass `--cfg antithesis` in RUSTFLAGS.
+[target.'cfg(antithesis)'.dependencies]
+antithesis-instrumentation.workspace = true
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(antithesis)'] }
+
 [dev-dependencies]
 tempfile.workspace = true
 

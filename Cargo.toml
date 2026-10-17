@@ -108,6 +108,10 @@ alloy-primitives = "=1.7.1"  # Ethereum primitives - LOW RISK: Alloy/Paradigm te
 alloy-signer = "=1.8.3"  # Ethereum signing abstraction - LOW RISK: Alloy/Paradigm team
 alloy-signer-local = "=1.8.3"  # Local Ethereum signer - LOW RISK: Alloy/Paradigm team
 alloy-sol-types = "=1.7.1"  # Solidity types & EIP-712 - LOW RISK: Alloy/Paradigm team
+# Antithesis coverage instrumentation shim. Only builds compiled with `--cfg antithesis` use it.
+# Its build script downloads a C header from the antithesis-sdk-cpp GitHub repository.
+# LOW RISK: Antithesis (the testing platform vendor), MIT, about 20 lines of code that forward coverage callbacks.
+antithesis-instrumentation = "=0.1.0"
 anyhow = "=1.0.104"  # Error handling - MEDIUM RISK: Reputable individual maintainer (dtolnay), 410M downloads
 assert_cmd = "=2.2.2"  # Assert command for testing - LOW RISK: assert-rs team, 1M+ downloads
 async-trait = "=0.1.92"  # Async trait support -  MEDIUM RISK: Reputable individual maintainer (dtolnay), 292M downloads
