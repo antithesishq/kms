@@ -1,0 +1,51 @@
+# Creates the two buckets and the access key every other component authenticates with.
+#
+# `mc anonymous set public local/kms-public` is not cosmetic: each core's
+# kms-core-init-load-env init container curls its peers' CA certificates out of
+# kms-public with no credentials, so the bucket must be anonymously readable.
+#
+# Taken from deploy_minio() in deploy-threshold-k3s.sh (the version that was actually
+# verified end-to-end), not from k8s/minio-provision-job.yaml, which omits HOME=/tmp.
+# `mc` writes its config under $HOME and the pod cannot write the image's default.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-provision
+  namespace: kms-threshold-staging
+  annotations:
+    kapp.k14s.io/change-group: minio-ready
+    kapp.k14s.io/change-rule: upsert after upserting minio
+spec:
+  backoffLimit: 6
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: mc
+        image: docker.io/scnd/mc-mirror:RELEASE.2025-02-04T04-57-50Z
+        imagePullPolicy: Never
+        env:
+        - name: HOME
+          value: /tmp
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          set -e
+          mc alias set local http://minio:9000 minioadmin minioadmin
+          # kapp already waits for the MinIO Deployment, but the readiness probe can
+          # pass a beat before the API accepts writes. Cheaper to wait than to burn a
+          # retry.
+          i=0
+          until mc ls local >/dev/null 2>&1; do
+            i=$((i + 1))
+            [ "$i" -gt 60 ] && { echo "minio never became writable"; exit 1; }
+            sleep 2
+          done
+          mc mb --ignore-existing local/kms-public
+          mc mb --ignore-existing local/kms-private
+          mc admin user add local kms-access-key-id kms-secret-access-key || true
+          mc admin policy attach local readwrite --user kms-access-key-id || \
+            echo "policy attach: already attached"
+          # The cores and the core-client read public material anonymously.
+          mc anonymous set public local/kms-public
+          mc ls local

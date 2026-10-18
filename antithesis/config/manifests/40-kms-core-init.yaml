@@ -85,6 +85,12 @@ spec:
         - mountPath: /opt/antithesis/test/v1/public_decrypt/anytime_reshare_key.sh
           subPath: anytime_reshare_key.sh
           name: workload-tests
+        - mountPath: /opt/antithesis/test/v1/public_decrypt/parallel_driver_user_decrypt.sh
+          subPath: parallel_driver_user_decrypt.sh
+          name: workload-tests
+        - mountPath: /opt/antithesis/test/v1/public_decrypt/eventually_recovers_after_faults.sh
+          subPath: eventually_recovers_after_faults.sh
+          name: workload-tests
         resources:
           requests:
             memory: 1Gi

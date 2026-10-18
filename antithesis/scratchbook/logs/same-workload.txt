@@ -1,0 +1,8 @@
+PASS 1 only SUT image tags differ
+PASS 2 every KMS image in the variant uses speedrun-3095d82a-prefix887
+PASS 3 core-service:speedrun-3095d82a-prefix887 in registry
+PASS 3 core-service-probe:speedrun-3095d82a-prefix887 in registry
+PASS 3 core-client:speedrun-3095d82a-prefix887 in registry
+PASS 3 init-envsubst:speedrun-3095d82a-prefix887 in registry
+PASS 3 core-service layers differ (32a1e62a26d643fb vs 9f3bf0438b0804fe)
+PASS 4 workload ConfigMap identical (c1ee4019f9ae)

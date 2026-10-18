@@ -1,0 +1,28 @@
+Building config image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/snouty-config:20261018-065255-d9f3
+Pushing config image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/snouty-config:20261018-065255-d9f3
+Config image pushed successfully: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/snouty-config@sha256:6164c8147ab68a26936a695cdba35bfc53e95c61315bf7aa277ef2fa2b25f44f
+
+Requesting Antithesis test run with params:
+{
+  "antithesis.test_name": "speedrun/zama-kms/kms@3095d82a-fix-decryption-stalls",
+  "antithesis.description": "speedrun fix-verify fixverify-decryption-stalls-after-core-restart #1: blinded patch for decryption-stalls-after-core-restart on the pre-fix build; level 3 like hunt-prefix-1, 120 m, turbo",
+  "antithesis.duration": "120",
+  "antithesis.source": "speedrun",
+  "antithesis.config_image": "snouty-config@sha256:6164c8147ab68a26936a695cdba35bfc53e95c61315bf7aa277ef2fa2b25f44f",
+  "attrs.tool": "speedrun",
+  "attrs.customer": "zama-kms",
+  "attrs.system": "kms",
+  "attrs.purpose": "fix-verify",
+  "attrs.build": "fixverify-decryption-stalls-after-core-restart",
+  "attrs.ref": "3095d82a-fix-decryption-stalls",
+  "antithesis.performance_tier": "turbo",
+  "custom.enabled_faults": "network,pod_stop,pod_kill,clock_jitter",
+  "custom.container_faults_stop_exclusion_patterns": "^kms-core-client,^minio-",
+  "custom.container_faults_kill_exclusion_patterns": "^kms-core-client,^minio-",
+  "vcs.repo_branch": "antithesis-poc-speedrun",
+  "vcs.version_id": "3095d82afc277661a2d1629f8d31cc91bf4761f0",
+  "run.caller_type": "snouty"
+}
+{
+  "runId": "a7167532671d016c1683aa3df1145e45-64-4"
+}

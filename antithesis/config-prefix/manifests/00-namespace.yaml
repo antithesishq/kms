@@ -1,0 +1,6 @@
+# Antithesis ships only the `default` namespace, so the SUT namespace must be
+# created by the manifests themselves. kapp orders this before everything else.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kms-threshold-staging

@@ -35,7 +35,7 @@ In a run, the triage report's Setup group shows whether this worked:
 | `k3s` | Starts local k3s |
 | `load` | Imports the images the manifests use into k3s (runs `config` first) |
 | `up` / `down` | Deploys / deletes the manifests on k3s (`up` runs `config` first) |
-| `test` | Runs the test commands in the client pod: keygen, driver, reshare, driver |
+| `test` | Runs the test commands in the client pod: keygen, driver, reshare, driver, recovery check |
 
 ## Image tags
 

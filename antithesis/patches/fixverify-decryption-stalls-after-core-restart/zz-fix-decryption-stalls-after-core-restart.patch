@@ -1,0 +1,81 @@
+diff --git a/core/threshold-networking/src/constants.rs b/core/threshold-networking/src/constants.rs
+index ee2ea53..826bb97 100644
+--- a/core/threshold-networking/src/constants.rs
++++ b/core/threshold-networking/src/constants.rs
+@@ -32,6 +32,20 @@ pub const MAX_INTERVAL: Duration = Duration::from_secs(60);
+ /// The default maximum elapsed time before giving up on retrying
+ pub(crate) const MAX_ELAPSED_TIME: Duration = Duration::from_secs(60);
+ 
++/// Interval between the HTTP/2 PINGs sent on a core-to-core channel, also while it is idle.
++/// A peer that disappears without closing its connections (a killed pod, or a close lost to a
++/// network fault) is otherwise never noticed, and every later message is written into the dead
++/// connection until the kernel gives up on it.
++pub(crate) const CORE_TO_CORE_KEEP_ALIVE_INTERVAL: Duration = Duration::from_secs(10);
++
++/// Time to wait for the acknowledgement of a PING before the connection is closed, which fails
++/// the pending sends (so they are retried) and makes the channel reconnect.
++pub(crate) const CORE_TO_CORE_KEEP_ALIVE_TIMEOUT: Duration = Duration::from_secs(20);
++
++/// Maximum time to establish a core-to-core connection (TCP and TLS handshakes), which the
++/// keep-alive does not cover.
++pub(crate) const CORE_TO_CORE_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
++
+ /// maximum number of seconds that a party waits for a network message during a protocol
+ pub(crate) const NETWORK_TIMEOUT: Duration = Duration::from_secs(5);
+ 
+diff --git a/core/threshold-networking/src/sending_service/service.rs b/core/threshold-networking/src/sending_service/service.rs
+index 8a35164..3c83b29 100644
+--- a/core/threshold-networking/src/sending_service/service.rs
++++ b/core/threshold-networking/src/sending_service/service.rs
+@@ -8,6 +8,9 @@ use std::str::FromStr;
+ use std::sync::Arc;
+ use std::time::Duration;
+ 
++use crate::constants::{
++    CORE_TO_CORE_CONNECT_TIMEOUT, CORE_TO_CORE_KEEP_ALIVE_INTERVAL, CORE_TO_CORE_KEEP_ALIVE_TIMEOUT,
++};
+ use crate::ggen::SendValueRequest;
+ use crate::ggen::Status;
+ use crate::ggen::gnetworking_client::GnetworkingClient;
+@@ -139,9 +142,18 @@ impl GrpcSendingService {
+                 // Use the TCP_NODELAY mode to ensure everything gets sent immediately by disabling Nagle's algorithm.
+                 // Note that this decreases latency but increases network bandwidth usage. If bandwidth is a concern,
+                 // then this should be changed
++                //
++                // The channel is cached in `channel_map` and shared by all sessions with this
++                // peer, and `send_value` has no deadline. HTTP/2 keep-alive PINGs (also while
++                // idle) make a connection whose peer vanished without closing it fail within
++                // CORE_TO_CORE_KEEP_ALIVE_INTERVAL + CORE_TO_CORE_KEEP_ALIVE_TIMEOUT, so pending
++                // sends are retried and the channel reconnects to the restarted peer.
+                 let endpoint = Channel::builder(endpoint)
+                     .http2_adaptive_window(true)
+-                    .tcp_nodelay(true);
++                    .tcp_nodelay(true)
++                    .http2_keep_alive_interval(CORE_TO_CORE_KEEP_ALIVE_INTERVAL)
++                    .keep_alive_timeout(CORE_TO_CORE_KEEP_ALIVE_TIMEOUT)
++                    .keep_alive_while_idle(true);
+                 // we have to pass a custom TLS connector to
+                 // tonic::transport::Channel to be able to use a custom rustls
+                 // ClientConfig that overrides the certificate verifier for AWS
+@@ -152,6 +164,10 @@ impl GrpcSendingService {
+                     .with_server_name_resolver(FixedServerNameResolver::new(domain_name))
+                     .enable_http2()
+                     .build();
++                // Bound the TCP and TLS handshakes done by the custom connector, which the
++                // keep-alive does not cover.
++                let https_connector =
++                    tower::timeout::Timeout::new(https_connector, CORE_TO_CORE_CONNECT_TIMEOUT);
+                 Channel::new(https_connector, endpoint)
+             }
+             None => {
+@@ -162,6 +178,10 @@ impl GrpcSendingService {
+                 Channel::builder(endpoint)
+                     .http2_adaptive_window(true)
+                     .tcp_nodelay(true)
++                    .http2_keep_alive_interval(CORE_TO_CORE_KEEP_ALIVE_INTERVAL)
++                    .keep_alive_timeout(CORE_TO_CORE_KEEP_ALIVE_TIMEOUT)
++                    .keep_alive_while_idle(true)
++                    .connect_timeout(CORE_TO_CORE_CONNECT_TIMEOUT)
+                     .connect_lazy()
+             }
+         };

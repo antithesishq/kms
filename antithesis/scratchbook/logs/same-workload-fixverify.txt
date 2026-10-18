@@ -1,0 +1,8 @@
+PASS 1 only SUT image tags differ
+PASS 2 every KMS image in the variant uses speedrun-3095d82a-fix-decryption-stalls
+PASS 3 core-service:speedrun-3095d82a-fix-decryption-stalls in registry
+PASS 3 core-service-probe:speedrun-3095d82a-fix-decryption-stalls in registry
+PASS 3 core-client:speedrun-3095d82a-fix-decryption-stalls in registry
+PASS 3 init-envsubst:speedrun-3095d82a-fix-decryption-stalls in registry
+PASS 3 core-service layers differ (9f3bf0438b0804fe vs b8dd5a983c3e6a03)
+PASS 4 workload ConfigMap identical (c1ee4019f9ae)

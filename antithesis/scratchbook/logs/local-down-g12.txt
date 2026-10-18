@@ -1,0 +1,230 @@
+make: Entering directory '/home/exedev/kms/antithesis'
+kapp delete -a kms --yes
+Target cluster 'https://127.0.0.1:6443' (nodes: ashvin-zama-kms)
+
+Changes
+
+Namespace              Name                                Kind                   Age  Op      Op st.  Wait to  Rs  Ri  
+(cluster)              kms-threshold-staging               Namespace              30m  delete  -       delete   ok  -  
+kms-threshold-staging  kms-core-1-core                     Endpoints              30m  -       -       delete   ok  -  
+^                      kms-core-1-core                     Service                30m  delete  -       delete   ok  -  
+^                      kms-core-1-core                     StatefulSet            29m  delete  -       delete   ok  -  
+^                      kms-core-1-core-1                   Endpoints              30m  -       -       delete   ok  -  
+^                      kms-core-1-core-1                   Pod                    29m  -       -       delete   ok  -  
+^                      kms-core-1-core-1                   PodMetrics             0s   -       -       delete   ok  -  
+^                      kms-core-1-core-1                   Service                30m  delete  -       delete   ok  -  
+^                      kms-core-1-core-1-7lzz2             EndpointSlice          30m  -       -       delete   ok  -  
+^                      kms-core-1-core-cb95b7cb            ControllerRevision     29m  -       -       delete   ok  -  
+^                      kms-core-1-core-config              ConfigMap              30m  delete  -       delete   ok  -  
+^                      kms-core-1-core-s5hj8               EndpointSlice          30m  -       -       delete   ok  -  
+^                      kms-core-2-core                     Endpoints              30m  -       -       delete   ok  -  
+^                      kms-core-2-core                     Service                30m  delete  -       delete   ok  -  
+^                      kms-core-2-core                     StatefulSet            29m  delete  -       delete   ok  -  
+^                      kms-core-2-core-2                   Endpoints              30m  -       -       delete   ok  -  
+^                      kms-core-2-core-2                   Pod                    29m  -       -       delete   ok  -  
+^                      kms-core-2-core-2                   Service                30m  delete  -       delete   ok  -  
+^                      kms-core-2-core-2-fz62k             EndpointSlice          30m  -       -       delete   ok  -  
+^                      kms-core-2-core-8f56ccd4c           ControllerRevision     29m  -       -       delete   ok  -  
+^                      kms-core-2-core-cb8nk               EndpointSlice          30m  -       -       delete   ok  -  
+^                      kms-core-2-core-config              ConfigMap              30m  delete  -       delete   ok  -  
+^                      kms-core-3-core                     Endpoints              30m  -       -       delete   ok  -  
+^                      kms-core-3-core                     Service                30m  delete  -       delete   ok  -  
+^                      kms-core-3-core                     StatefulSet            29m  delete  -       delete   ok  -  
+^                      kms-core-3-core-3                   Endpoints              30m  -       -       delete   ok  -  
+^                      kms-core-3-core-3                   Pod                    3m   -       -       delete   ok  -  
+^                      kms-core-3-core-3                   Service                30m  delete  -       delete   ok  -  
+^                      kms-core-3-core-3-px55f             EndpointSlice          30m  -       -       delete   ok  -  
+^                      kms-core-3-core-5nvfr               EndpointSlice          30m  -       -       delete   ok  -  
+^                      kms-core-3-core-6594b67fcc          ControllerRevision     29m  -       -       delete   ok  -  
+^                      kms-core-3-core-config              ConfigMap              30m  delete  -       delete   ok  -  
+^                      kms-core-4-core                     Endpoints              30m  -       -       delete   ok  -  
+^                      kms-core-4-core                     Service                30m  delete  -       delete   ok  -  
+^                      kms-core-4-core                     StatefulSet            29m  delete  -       delete   ok  -  
+^                      kms-core-4-core-4                   Endpoints              30m  -       -       delete   ok  -  
+^                      kms-core-4-core-4                   Pod                    29m  -       -       delete   ok  -  
+^                      kms-core-4-core-4                   Service                30m  delete  -       delete   ok  -  
+^                      kms-core-4-core-4-bqwxl             EndpointSlice          30m  -       -       delete   ok  -  
+^                      kms-core-4-core-86685f7b87          ControllerRevision     29m  -       -       delete   ok  -  
+^                      kms-core-4-core-config              ConfigMap              30m  delete  -       delete   ok  -  
+^                      kms-core-4-core-hgjzd               EndpointSlice          30m  -       -       delete   ok  -  
+^                      kms-core-client                     StatefulSet            29m  delete  -       delete   ok  -  
+^                      kms-core-client-0                   Pod                    7m   -       -       delete   ok  -  
+^                      kms-core-client-69dd5cff87          ControllerRevision     29m  -       -       delete   ok  -  
+^                      kms-core-client-7675bdd8c9          ControllerRevision     8m   -       -       delete   ok  -  
+^                      kms-core-client-config              ConfigMap              30m  delete  -       delete   ok  -  
+^                      kms-core-init-threshold-init        Job                    29m  delete  -       delete   ok  Completed  
+^                      kms-core-init-threshold-init-r6clr  Pod                    29m  -       -       delete   ok  -  
+^                      kms-prepopulate-keys                Job                    29m  delete  -       delete   ok  Completed  
+^                      kms-prepopulate-keys-xqbgh          Pod                    29m  -       -       delete   ok  -  
+^                      kms-workload-tests                  ConfigMap              30m  delete  -       delete   ok  -  
+^                      minio                               Deployment             30m  delete  -       delete   ok  -  
+^                      minio                               Endpoints              30m  -       -       delete   ok  -  
+^                      minio                               Service                30m  delete  -       delete   ok  -  
+^                      minio-6895946fb7                    ReplicaSet             30m  -       -       delete   ok  -  
+^                      minio-6895946fb7-lx9r4              Pod                    30m  -       -       delete   ok  -  
+^                      minio-8k9l7                         EndpointSlice          30m  -       -       delete   ok  -  
+^                      minio-data                          PersistentVolumeClaim  30m  delete  -       delete   ok  -  
+^                      minio-provision                     Job                    29m  delete  -       delete   ok  Completed  
+^                      minio-provision-lkldw               Pod                    29m  -       -       delete   ok  -  
+
+Op:      0 create, 26 delete, 0 update, 35 noop, 0 exists
+Wait to: 0 reconcile, 61 delete, 0 noop
+
+9:08:19PM: ---- applying 61 changes [0/61 done] ----
+9:08:19PM: noop pod/kms-core-init-threshold-init-r6clr (v1) namespace: kms-threshold-staging
+9:08:19PM: delete job/kms-core-init-threshold-init (batch/v1) namespace: kms-threshold-staging
+9:08:19PM: noop pod/kms-core-4-core-4 (v1) namespace: kms-threshold-staging
+9:08:19PM: delete configmap/kms-workload-tests (v1) namespace: kms-threshold-staging
+9:08:19PM: delete service/kms-core-1-core-1 (v1) namespace: kms-threshold-staging
+9:08:19PM: noop controllerrevision/kms-core-client-69dd5cff87 (apps/v1) namespace: kms-threshold-staging
+9:08:19PM: noop endpoints/minio (v1) namespace: kms-threshold-staging
+9:08:19PM: noop controllerrevision/kms-core-1-core-cb95b7cb (apps/v1) namespace: kms-threshold-staging
+9:08:19PM: noop controllerrevision/kms-core-4-core-86685f7b87 (apps/v1) namespace: kms-threshold-staging
+9:08:19PM: noop controllerrevision/kms-core-client-7675bdd8c9 (apps/v1) namespace: kms-threshold-staging
+9:08:19PM: noop pod/kms-core-3-core-3 (v1) namespace: kms-threshold-staging
+9:08:19PM: delete configmap/kms-core-2-core-config (v1) namespace: kms-threshold-staging
+9:08:19PM: noop endpoints/kms-core-2-core (v1) namespace: kms-threshold-staging
+9:08:19PM: noop pod/kms-core-1-core-1 (v1) namespace: kms-threshold-staging
+9:08:19PM: noop pod/kms-core-2-core-2 (v1) namespace: kms-threshold-staging
+9:08:19PM: noop endpointslice/kms-core-1-core-1-7lzz2 (discovery.k8s.io/v1) namespace: kms-threshold-staging
+9:08:19PM: noop endpointslice/kms-core-1-core-s5hj8 (discovery.k8s.io/v1) namespace: kms-threshold-staging
+9:08:19PM: noop endpointslice/kms-core-2-core-2-fz62k (discovery.k8s.io/v1) namespace: kms-threshold-staging
+9:08:19PM: noop endpointslice/minio-8k9l7 (discovery.k8s.io/v1) namespace: kms-threshold-staging
+9:08:19PM: delete service/kms-core-1-core (v1) namespace: kms-threshold-staging
+9:08:19PM: noop podmetrics/kms-core-1-core-1 (metrics.k8s.io/v1beta1) namespace: kms-threshold-staging
+9:08:19PM: delete job/kms-prepopulate-keys (batch/v1) namespace: kms-threshold-staging
+9:08:19PM: delete namespace/kms-threshold-staging (v1) cluster
+9:08:19PM: delete statefulset/kms-core-2-core (apps/v1) namespace: kms-threshold-staging
+9:08:20PM: delete service/kms-core-2-core (v1) namespace: kms-threshold-staging
+9:08:20PM: noop endpoints/kms-core-2-core-2 (v1) namespace: kms-threshold-staging
+9:08:20PM: noop endpoints/kms-core-3-core-3 (v1) namespace: kms-threshold-staging
+9:08:20PM: delete persistentvolumeclaim/minio-data (v1) namespace: kms-threshold-staging
+9:08:20PM: delete deployment/minio (apps/v1) namespace: kms-threshold-staging
+9:08:20PM: noop controllerrevision/kms-core-2-core-8f56ccd4c (apps/v1) namespace: kms-threshold-staging
+9:08:20PM: delete statefulset/kms-core-client (apps/v1) namespace: kms-threshold-staging
+9:08:20PM: noop endpoints/kms-core-3-core (v1) namespace: kms-threshold-staging
+9:08:20PM: noop endpointslice/kms-core-4-core-hgjzd (discovery.k8s.io/v1) namespace: kms-threshold-staging
+9:08:20PM: noop controllerrevision/kms-core-3-core-6594b67fcc (apps/v1) namespace: kms-threshold-staging
+9:08:20PM: delete statefulset/kms-core-1-core (apps/v1) namespace: kms-threshold-staging
+9:08:20PM: delete service/minio (v1) namespace: kms-threshold-staging
+9:08:20PM: delete statefulset/kms-core-4-core (apps/v1) namespace: kms-threshold-staging
+9:08:20PM: delete configmap/kms-core-4-core-config (v1) namespace: kms-threshold-staging
+9:08:20PM: noop replicaset/minio-6895946fb7 (apps/v1) namespace: kms-threshold-staging
+9:08:20PM: noop pod/kms-core-client-0 (v1) namespace: kms-threshold-staging
+9:08:20PM: delete job/minio-provision (batch/v1) namespace: kms-threshold-staging
+9:08:20PM: noop endpointslice/kms-core-3-core-5nvfr (discovery.k8s.io/v1) namespace: kms-threshold-staging
+9:08:20PM: delete configmap/kms-core-3-core-config (v1) namespace: kms-threshold-staging
+9:08:20PM: noop pod/minio-provision-lkldw (v1) namespace: kms-threshold-staging
+9:08:20PM: noop endpointslice/kms-core-2-core-cb8nk (discovery.k8s.io/v1) namespace: kms-threshold-staging
+9:08:20PM: noop endpointslice/kms-core-3-core-3-px55f (discovery.k8s.io/v1) namespace: kms-threshold-staging
+9:08:20PM: noop endpointslice/kms-core-4-core-4-bqwxl (discovery.k8s.io/v1) namespace: kms-threshold-staging
+9:08:20PM: noop endpoints/kms-core-1-core (v1) namespace: kms-threshold-staging
+9:08:20PM: noop endpoints/kms-core-4-core (v1) namespace: kms-threshold-staging
+9:08:20PM: delete service/kms-core-3-core-3 (v1) namespace: kms-threshold-staging
+9:08:20PM: delete service/kms-core-3-core (v1) namespace: kms-threshold-staging
+9:08:20PM: noop endpoints/kms-core-1-core-1 (v1) namespace: kms-threshold-staging
+9:08:20PM: noop endpoints/kms-core-4-core-4 (v1) namespace: kms-threshold-staging
+9:08:20PM: noop pod/kms-prepopulate-keys-xqbgh (v1) namespace: kms-threshold-staging
+9:08:20PM: delete configmap/kms-core-1-core-config (v1) namespace: kms-threshold-staging
+9:08:20PM: delete configmap/kms-core-client-config (v1) namespace: kms-threshold-staging
+9:08:20PM: noop pod/minio-6895946fb7-lx9r4 (v1) namespace: kms-threshold-staging
+9:08:20PM: delete service/kms-core-4-core (v1) namespace: kms-threshold-staging
+9:08:20PM: delete statefulset/kms-core-3-core (apps/v1) namespace: kms-threshold-staging
+9:08:20PM: delete service/kms-core-4-core-4 (v1) namespace: kms-threshold-staging
+9:08:20PM: delete service/kms-core-2-core-2 (v1) namespace: kms-threshold-staging
+9:08:20PM: ---- waiting on 61 changes [0/61 done] ----
+9:08:20PM: ok: delete endpoints/kms-core-2-core (v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete endpointslice/minio-8k9l7 (discovery.k8s.io/v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete service/kms-core-2-core-2 (v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete pod/kms-core-init-threshold-init-r6clr (v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete endpoints/minio (v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete service/kms-core-1-core (v1) namespace: kms-threshold-staging
+9:08:20PM: ongoing: delete namespace/kms-threshold-staging (v1) cluster
+9:08:20PM:  ^ Deleting
+9:08:20PM: ok: delete job/kms-prepopulate-keys (batch/v1) namespace: kms-threshold-staging
+9:08:20PM: ongoing: delete pod/kms-core-client-0 (v1) namespace: kms-threshold-staging
+9:08:20PM:  ^ Deleting
+9:08:20PM: ongoing: delete podmetrics/kms-core-1-core-1 (metrics.k8s.io/v1beta1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete service/kms-core-2-core (v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete statefulset/kms-core-2-core (apps/v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete endpoints/kms-core-2-core-2 (v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete endpoints/kms-core-3-core-3 (v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete deployment/minio (apps/v1) namespace: kms-threshold-staging
+9:08:20PM: ongoing: delete persistentvolumeclaim/minio-data (v1) namespace: kms-threshold-staging
+9:08:20PM:  ^ Waiting on finalizers: kubernetes.io/pvc-protection
+9:08:20PM: ok: delete job/minio-provision (batch/v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete controllerrevision/kms-core-2-core-8f56ccd4c (apps/v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete statefulset/kms-core-client (apps/v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete configmap/kms-core-3-core-config (v1) namespace: kms-threshold-staging
+9:08:20PM: ongoing: delete endpointslice/kms-core-3-core-5nvfr (discovery.k8s.io/v1) namespace: kms-threshold-staging
+9:08:20PM: ongoing: delete endpointslice/kms-core-4-core-hgjzd (discovery.k8s.io/v1) namespace: kms-threshold-staging
+9:08:20PM: ongoing: delete pod/minio-provision-lkldw (v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete endpointslice/kms-core-2-core-cb8nk (discovery.k8s.io/v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete endpoints/kms-core-3-core (v1) namespace: kms-threshold-staging
+9:08:20PM: ongoing: delete endpointslice/kms-core-3-core-3-px55f (discovery.k8s.io/v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete configmap/kms-core-4-core-config (v1) namespace: kms-threshold-staging
+9:08:20PM: ongoing: delete endpointslice/kms-core-4-core-4-bqwxl (discovery.k8s.io/v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete replicaset/minio-6895946fb7 (apps/v1) namespace: kms-threshold-staging
+9:08:20PM: ongoing: delete controllerrevision/kms-core-3-core-6594b67fcc (apps/v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete endpoints/kms-core-1-core (v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete configmap/kms-workload-tests (v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete endpoints/kms-core-4-core (v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete service/kms-core-3-core-3 (v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete service/kms-core-3-core (v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete job/kms-core-init-threshold-init (batch/v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete endpoints/kms-core-1-core-1 (v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete statefulset/kms-core-4-core (apps/v1) namespace: kms-threshold-staging
+9:08:20PM: ongoing: delete pod/kms-core-4-core-4 (v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete endpoints/kms-core-4-core-4 (v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete service/minio (v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete controllerrevision/kms-core-4-core-86685f7b87 (apps/v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete controllerrevision/kms-core-client-7675bdd8c9 (apps/v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete pod/kms-prepopulate-keys-xqbgh (v1) namespace: kms-threshold-staging
+9:08:20PM: ongoing: delete pod/kms-core-3-core-3 (v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete configmap/kms-core-1-core-config (v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete endpointslice/kms-core-1-core-s5hj8 (discovery.k8s.io/v1) namespace: kms-threshold-staging
+9:08:20PM: ongoing: delete pod/minio-6895946fb7-lx9r4 (v1) namespace: kms-threshold-staging
+9:08:20PM:  ^ Deleting
+9:08:20PM: ok: delete configmap/kms-core-client-config (v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete endpointslice/kms-core-1-core-1-7lzz2 (discovery.k8s.io/v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete service/kms-core-1-core-1 (v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete service/kms-core-4-core (v1) namespace: kms-threshold-staging
+9:08:20PM: ongoing: delete pod/kms-core-2-core-2 (v1) namespace: kms-threshold-staging
+9:08:20PM:  ^ Deleting
+9:08:20PM: ongoing: delete pod/kms-core-1-core-1 (v1) namespace: kms-threshold-staging
+9:08:20PM:  ^ Deleting
+9:08:20PM: ok: delete controllerrevision/kms-core-1-core-cb95b7cb (apps/v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete service/kms-core-4-core-4 (v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete statefulset/kms-core-3-core (apps/v1) namespace: kms-threshold-staging
+9:08:20PM: ongoing: delete endpointslice/kms-core-2-core-2-fz62k (discovery.k8s.io/v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete configmap/kms-core-2-core-config (v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete controllerrevision/kms-core-client-69dd5cff87 (apps/v1) namespace: kms-threshold-staging
+9:08:20PM: ok: delete statefulset/kms-core-1-core (apps/v1) namespace: kms-threshold-staging
+9:08:20PM: ---- waiting on 16 changes [45/61 done] ----
+9:08:20PM: ongoing: delete pod/kms-core-4-core-4 (v1) namespace: kms-threshold-staging
+9:08:20PM:  ^ Deleting
+9:08:23PM: ok: delete endpointslice/kms-core-4-core-4-bqwxl (discovery.k8s.io/v1) namespace: kms-threshold-staging
+9:08:23PM: ok: delete endpointslice/kms-core-2-core-2-fz62k (discovery.k8s.io/v1) namespace: kms-threshold-staging
+9:08:23PM: ok: delete persistentvolumeclaim/minio-data (v1) namespace: kms-threshold-staging
+9:08:23PM: ok: delete endpointslice/kms-core-3-core-5nvfr (discovery.k8s.io/v1) namespace: kms-threshold-staging
+9:08:23PM: ok: delete endpointslice/kms-core-4-core-hgjzd (discovery.k8s.io/v1) namespace: kms-threshold-staging
+9:08:23PM: ok: delete pod/minio-6895946fb7-lx9r4 (v1) namespace: kms-threshold-staging
+9:08:23PM: ok: delete controllerrevision/kms-core-3-core-6594b67fcc (apps/v1) namespace: kms-threshold-staging
+9:08:23PM: ok: delete pod/minio-provision-lkldw (v1) namespace: kms-threshold-staging
+9:08:23PM: ok: delete endpointslice/kms-core-3-core-3-px55f (discovery.k8s.io/v1) namespace: kms-threshold-staging
+9:08:23PM: ongoing: delete pod/kms-core-3-core-3 (v1) namespace: kms-threshold-staging
+9:08:23PM:  ^ Deleting
+9:08:23PM: ---- waiting on 7 changes [54/61 done] ----
+9:08:53PM: ok: delete pod/kms-core-2-core-2 (v1) namespace: kms-threshold-staging
+9:08:53PM: ok: delete pod/kms-core-3-core-3 (v1) namespace: kms-threshold-staging
+9:08:53PM: ok: delete pod/kms-core-4-core-4 (v1) namespace: kms-threshold-staging
+9:08:53PM: ok: delete pod/kms-core-client-0 (v1) namespace: kms-threshold-staging
+9:08:53PM: ok: delete pod/kms-core-1-core-1 (v1) namespace: kms-threshold-staging
+9:08:53PM: ok: delete podmetrics/kms-core-1-core-1 (metrics.k8s.io/v1beta1) namespace: kms-threshold-staging
+9:08:53PM: ---- waiting on 1 changes [60/61 done] ----
+9:09:05PM: ok: delete namespace/kms-threshold-staging (v1) cluster
+9:09:05PM: ---- applying complete [61/61 done] ----
+9:09:05PM: ---- waiting complete [61/61 done] ----
+
+Succeeded
+make: Leaving directory '/home/exedev/kms/antithesis'

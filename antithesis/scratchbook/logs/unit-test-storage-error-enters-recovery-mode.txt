@@ -1,0 +1,81 @@
+=== 2026-10-18T09:39:44Z A: test only (no fix), tree 3095d82a + test hunks of antithesis/fixes/storage-error-enters-recovery-mode.patch
+ core/service/src/engine/backup_operator.rs | 128 ++++++++++++++++++++++++++++-
+ 1 file changed, 127 insertions(+), 1 deletion(-)
+    Finished `test` profile [optimized + debuginfo] target(s) in 2m 07s
+     Running unittests src/lib.rs (target/debug/deps/kms_lib-942523391ee9d49f)
+running 2 tests
+test engine::backup_operator::tests::boot_base_kms_does_not_enter_recovery_mode_when_the_signing_key_is_unreadable ... FAILED
+test engine::backup_operator::tests::boot_base_kms_enters_recovery_mode_without_a_signing_key ... ok
+failures:
+---- engine::backup_operator::tests::boot_base_kms_does_not_enter_recovery_mode_when_the_signing_key_is_unreadable stdout ----
+thread 'engine::backup_operator::tests::boot_base_kms_does_not_enter_recovery_mode_when_the_signing_key_is_unreadable' (588) panicked at core/service/src/engine/backup_operator.rs:1981:13:
+a node whose signing key could not be read must not boot in recovery mode (listing fails: false)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+failures:
+    engine::backup_operator::tests::boot_base_kms_does_not_enter_recovery_mode_when_the_signing_key_is_unreadable
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 1197 filtered out; finished in 0.03s
+error: test failed, to rerun pass `-p kms --lib`
+=== 2026-10-18T09:41:54Z B: full patch (fix + test)
+ core/service/src/engine/backup_operator.rs | 148 ++++++++++++++++++++++++++++-
+ 1 file changed, 147 insertions(+), 1 deletion(-)
+    Finished `test` profile [optimized + debuginfo] target(s) in 2m 20s
+     Running unittests src/lib.rs (target/debug/deps/kms_lib-942523391ee9d49f)
+running 2 tests
+test engine::backup_operator::tests::boot_base_kms_does_not_enter_recovery_mode_when_the_signing_key_is_unreadable ... ok
+test engine::backup_operator::tests::boot_base_kms_enters_recovery_mode_without_a_signing_key ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 1197 filtered out; finished in 0.03s
+=== 2026-10-18T09:44:17Z end
+=== 2026-10-18T09:44:28Z C: full patch, every test in engine::backup_operator and every test with 'recovery' in its name
+Run: cargo run -p generate-test-material -- --output ./test-material --profile insecure --parties 4
+---- client::tests::centralized::custodian_backup_tests::test_recovery_names_the_context_after_rotation_central stdout ----
+thread 'client::tests::centralized::custodian_backup_tests::test_recovery_names_the_context_after_rotation_central' (29) panicked at core/service/src/client/tests/centralized/custodian_backup_tests.rs:69:14:
+called `Result::unwrap()` on an `Err` value: Test material source path is not configured. Tests requiring pre-generated material need a `test-material/` directory at the workspace root.
+Run: cargo run -p generate-test-material -- --output ./test-material --profile insecure --parties 4
+---- client::tests::threshold::custodian_backup_tests::test_recovery_without_signing_material_threshold stdout ----
+thread 'client::tests::threshold::custodian_backup_tests::test_recovery_without_signing_material_threshold' (41) panicked at core/service/src/client/tests/threshold/custodian_backup_tests.rs:96:18:
+called `Result::unwrap()` on an `Err` value: Test material source path is not configured. Tests requiring pre-generated material need a `test-material/` directory at the workspace root.
+Run: cargo run -p generate-test-material -- --output ./test-material --profile insecure --parties 4
+---- client::tests::centralized::custodian_backup_tests::test_recovery_without_signing_material_central stdout ----
+thread 'client::tests::centralized::custodian_backup_tests::test_recovery_without_signing_material_central' (30) panicked at core/service/src/client/tests/centralized/custodian_backup_tests.rs:69:14:
+called `Result::unwrap()` on an `Err` value: Test material source path is not configured. Tests requiring pre-generated material need a `test-material/` directory at the workspace root.
+Run: cargo run -p generate-test-material -- --output ./test-material --profile insecure --parties 4
+---- client::tests::centralized::custodian_backup_tests::test_planted_public_recovery_material_ignored_central stdout ----
+thread 'client::tests::centralized::custodian_backup_tests::test_planted_public_recovery_material_ignored_central' (28) panicked at core/service/src/client/tests/centralized/custodian_backup_tests.rs:69:14:
+called `Result::unwrap()` on an `Err` value: Test material source path is not configured. Tests requiring pre-generated material need a `test-material/` directory at the workspace root.
+Run: cargo run -p generate-test-material -- --output ./test-material --profile insecure --parties 4
+failures:
+    client::tests::centralized::custodian_backup_tests::test_decrypt_after_recovery_central
+    client::tests::centralized::custodian_backup_tests::test_decrypt_after_recovery_centralized_negative
+    client::tests::centralized::custodian_backup_tests::test_planted_public_recovery_material_ignored_central
+    client::tests::centralized::custodian_backup_tests::test_recovery_names_the_context_after_rotation_central
+    client::tests::centralized::custodian_backup_tests::test_recovery_without_signing_material_central
+    client::tests::threshold::custodian_backup_tests::test_decrypt_after_recovery_threshold::case_1
+    client::tests::threshold::custodian_backup_tests::test_decrypt_after_recovery_threshold::case_2
+    client::tests::threshold::custodian_backup_tests::test_decrypt_after_recovery_threshold_negative
+    client::tests::threshold::custodian_backup_tests::test_recovery_names_the_context_after_rotation_threshold
+    client::tests::threshold::custodian_backup_tests::test_recovery_without_signing_material_threshold
+test result: FAILED. 40 passed; 10 failed; 0 ignored; 0 measured; 1149 filtered out; finished in 0.23s
+error: test failed, to rerun pass `-p kms --lib`
+=== 2026-10-18T09:44:30Z end
+note: the 10 failures in C all stop at setup: "Test material source path is not configured. Tests requiring pre-generated material need a test-material/ directory at the workspace root." Generating it (cargo run -p generate-test-material -- --output ./test-material --profile insecure --parties 4) and re-running them.
+=== 2026-10-18T09:44:56Z D: generate test material
+2026-10-18T10:01:29.736536Z  INFO kms_lib::vault::storage::crypto_material::utils: Successfully stored private threshold CRS data under the handle eb9aabc6a4a3772188ab9d54fc9029b3a0ac9d6857b367ab0025017a83666675 in storage "file storage with root_path '/src/test-material/testing/threshold-4/PRIV-p4'"
+2026-10-18T10:01:29.744614Z  INFO kms_lib::vault::storage::crypto_material::utils: Successfully stored private threshold CRS data under the handle eb9aabc6a4a3772188ab9d54fc9029b3a0ac9d6857b367ab0025017a83666675 in storage "file storage with root_path '/src/test-material/testing/threshold-4/PRIV-p1'"
+2026-10-18T10:01:29.761779Z  INFO kms_lib::vault::storage::crypto_material::utils: Successfully stored public threshold CRS data under the handle eb9aabc6a4a3772188ab9d54fc9029b3a0ac9d6857b367ab0025017a83666675 in storage "file storage with root_path '/src/test-material/testing/threshold-4/PUB-p2'"
+2026-10-18T10:01:29.778545Z  INFO kms_lib::vault::storage::crypto_material::utils: Successfully stored public threshold CRS data under the handle eb9aabc6a4a3772188ab9d54fc9029b3a0ac9d6857b367ab0025017a83666675 in storage "file storage with root_path '/src/test-material/testing/threshold-4/PUB-p3'"
+2026-10-18T10:01:29.798485Z  INFO kms_lib::vault::storage::crypto_material::utils: Successfully stored public threshold CRS data under the handle eb9aabc6a4a3772188ab9d54fc9029b3a0ac9d6857b367ab0025017a83666675 in storage "file storage with root_path '/src/test-material/testing/threshold-4/PUB-p4'"
+2026-10-18T10:01:29.815442Z  INFO kms_lib::vault::storage::crypto_material::utils: Successfully stored public threshold CRS data under the handle eb9aabc6a4a3772188ab9d54fc9029b3a0ac9d6857b367ab0025017a83666675 in storage "file storage with root_path '/src/test-material/testing/threshold-4/PUB-p1'"
+2026-10-18T10:01:29.846808Z  INFO generate_test_material: Insecure material generated successfully at: /src/test-material/testing
+2026-10-18T10:01:29.846825Z  INFO generate_test_material: Operation completed successfully
+=== 2026-10-18T10:01:31Z E: full patch, the 10 custodian recovery tests
+    Finished `test` profile [optimized + debuginfo] target(s) in 44.77s
+     Running unittests src/lib.rs (target/debug/deps/kms_lib-942523391ee9d49f)
+running 23 tests
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 1176 filtered out; finished in 41.57s
+=== 2026-10-18T10:02:58Z end
+=== 2026-10-18T10:03:09Z F: full patch, C's selection again with test material present
+    Finished `test` profile [optimized + debuginfo] target(s) in 0.69s
+     Running unittests src/lib.rs (target/debug/deps/kms_lib-942523391ee9d49f)
+running 50 tests
+test result: ok. 50 passed; 0 failed; 0 ignored; 0 measured; 1149 filtered out; finished in 14.06s
+=== 2026-10-18T10:03:24Z end

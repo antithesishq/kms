@@ -8,19 +8,46 @@ metadata:
 data:
   anytime_reshare_key.sh: |
     #!/bin/sh
-    # Reshares the workload's FHE key into a new epoch of the default context. The decryption
-    # driver also decrypts under the epochs that this command records (pick_epoch in
-    # helper_lib.sh), so its plaintext check covers the reshared key shares too.
+    # Reshares the workload's FHE key into a new epoch, then checks that the key is still the same
+    # key: its public key is unchanged and the epoch it was reshared from still decrypts correctly.
     #
     # kms-core-client new-epoch sends the reshare to all four cores and polls each core for the
     # result. It then checks that every result names the key and preprocessing IDs that were
     # sent, and that the signature of every result verifies over the published key material. The
     # CLI succeeds only when all four cores report success, but the protocol tolerates one faulty
     # party. A failed run can therefore leave an epoch that some cores hold and others do not.
-    # Such an epoch is recorded as unconfirmed, and the decryption driver tries it less often.
+    # Such an epoch is recorded as unconfirmed, and the decryption drivers try it less often. The
+    # drivers decrypt under the epochs that this command records (pick_epoch in helper_lib.sh),
+    # so their plaintext checks cover the reshared key shares too.
+    #
+    # Public key. Public material is stored per key ID, not per epoch, so a reshare must leave it
+    # byte-identical. Before the reshare the command reads PUB-p<i>/PublicKey/<key_id> of all four
+    # parties from MinIO and takes each one's digest; after new-epoch returns, done or not, it
+    # reads them again. A party whose object could not be read either time (a network fault) is
+    # left out; one that was there before and is gone after (404) counts as changed.
+    #
+    # Source epoch. After the reshare, done or not, the command runs one public decryption of a
+    # fresh value under the epoch it reshared from, with up to 2 attempts. A reshare that panicked
+    # or timed out may have taken effect on some cores and not on others, but either way the
+    # source epoch must keep its key shares. Availability is not checked here: an attempt without
+    # a verdict is allowed, only a wrong plaintext is a failure. As in the driver, an attempt that
+    # could not connect to a core is followed by one that leaves that core out (three-core config).
     #
     # This is an anytime command. It runs alongside the decryption drivers, as an operator's
     # reshare would, and copies of it can run at the same time. Each run uses a fresh epoch ID.
+    #
+    # Checks (Guarantee 3):
+    # - Always: every core's reshare result names the reshared key and its signature verifies over
+    #   the published key material (new-epoch's own checks).
+    # - Always: the public key every party publishes for the key is unchanged by the reshare.
+    # - Always: a public decryption under the source epoch after the reshare carries the encrypted
+    #   plaintext.
+    # - Sometimes: the public key was read back unchanged after a reshare that ended without a
+    #   verdict (judged on every such reshare).
+    # - Sometimes: a decryption under the source epoch succeeded after a reshare that ended without
+    #   a verdict (judged on every attempt after such a reshare).
+    # - Reachable: a reshare from an epoch that a reshare created succeeded; a reshare ended
+    #   without a verdict.
     . "$(dirname "$0")/helper_lib.sh"
     declare_catalog
 
@@ -65,6 +92,8 @@ data:
 
     previous="context_id:$DEFAULT_CONTEXT_ID;epoch_id:$source_epoch;previous_keys:[key_id=$key_id,preproc_id=$preproc_id,$digest_field=$keyset_digest,public_key_digest=$public_key_digest]"
 
+    pk_before=$(public_key_digests "$key_id" before)
+
     # --max-iter counts 0.5 s result polls per core.
     set -- -f config.toml --max-iter 1200 new-epoch --new-epoch-id "$new_epoch" \
       --new-context-id "$DEFAULT_CONTEXT_ID" --previous-epoch-params "$previous"
@@ -85,38 +114,283 @@ data:
         cli.out
     }
 
+    # The outcome: done (every core reported success and the CLI's checks passed), wrong (a core
+    # reported a result that fails the CLI's checks) or failed (no verdict).
+    exit_code=0
     if [ "$rc" -eq 0 ] && grep -q 'New epoch created' cli.out; then
+      outcome=done
       record_epoch "$new_epoch" "$key_id" confirmed
       details="{$inputs}"
       assert_always "$MSG_RESHARE_RESULT" true "$details"
       if [ "$source_epoch" != "$DEFAULT_EPOCH_ID" ]; then
         assert_reachable "$MSG_RESHARE_CHAINED" "$details"
       fi
-      exit 0
-    fi
-
-    if err=$(wrong_result); then
+    elif err=$(wrong_result); then
+      outcome=wrong
       # The cores consider the epoch done, so decryptions under it are worth a try as well.
       record_epoch "$new_epoch" "$key_id" unconfirmed
       assert_always "$MSG_RESHARE_RESULT" false "{$inputs,\"error\":\"$(json_str "$err")\"}"
       cat cli.out
-      exit 1
-    fi
-
-    # The CLI's argument parser exits with 2, so this script built a malformed command.
-    if [ "$rc" -eq 2 ]; then
+      exit_code=1
+    elif [ "$rc" -eq 2 ]; then
+      # The CLI's argument parser exits with 2, so this script built a malformed command.
       echo "kms-core-client rejected the arguments"
       cat cli.out
       exit 1
+    else
+      # Any other failure is a reshare that did not finish everywhere: a core was down, slow or
+      # cut off, or it rejected the request. The CLI reports a failed reshare as a panic, and the
+      # gRPC status carries only the code. The epoch is kept, because the other cores can
+      # complete it.
+      outcome=failed
+      record_epoch "$new_epoch" "$key_id" unconfirmed
+      err=$(grep -m 1 -A 2 'panicked at' cli.out || tail -n 3 cli.out)
+      assert_reachable "$MSG_RESHARE_NO_VERDICT" "{$inputs,\"error\":\"$(json_str "$err")\"}"
+      tail -n 20 cli.out
+    fi
+    inputs="$inputs,\"outcome\":\"$outcome\""
+
+    # Public key: compare every party that was read both before and after.
+    pk_after=$(public_key_digests "$key_id" after)
+    compared=0
+    changed=""
+    for p in 1 2 3 4; do
+      before=$(printf '%s\n' $pk_before | sed -n "s/^p$p=//p")
+      after=$(printf '%s\n' $pk_after | sed -n "s/^p$p=//p")
+      [ "${#before}" -eq 64 ] || continue
+      [ "$after" = unread ] && continue
+      compared=$((compared + 1))
+      [ "$after" = "$before" ] || changed="$changed p$p"
+    done
+    echo "public key digests before: $pk_before"
+    echo "public key digests after:  $pk_after"
+    if [ "$compared" -gt 0 ]; then
+      unchanged=true
+      [ -n "$changed" ] && unchanged=false
+      details="{$inputs,\"parties_compared\":$compared,\"changed\":\"${changed# }\",\"before\":\"${pk_before% }\",\"after\":\"${pk_after% }\"}"
+      assert_always "$MSG_RESHARE_PUBLIC_KEY" "$unchanged" "$details"
+      if [ "$outcome" = failed ]; then
+        assert_sometimes "$MSG_RESHARE_PUBLIC_KEY_FAILED" "$unchanged" "$details"
+      fi
+      [ "$unchanged" = true ] || exit_code=1
+    else
+      echo "could not read any party's public key both before and after; no public key check"
     fi
 
-    # Any other failure is a reshare that did not finish everywhere: a core was down, slow or cut
-    # off, or it rejected the request. The CLI reports a failed reshare as a panic, and the gRPC
-    # status carries only the code. The epoch is kept, because the other cores can complete it.
-    record_epoch "$new_epoch" "$key_id" unconfirmed
-    err=$(grep -m 1 -A 2 'panicked at' cli.out || tail -n 3 cli.out)
-    assert_reachable "$MSG_RESHARE_NO_VERDICT" "{$inputs,\"error\":\"$(json_str "$err")\"}"
-    tail -n 20 cli.out
+    # Source epoch: one public decryption of a fresh value under it, up to 2 attempts.
+    data_type=$(pick ebool euint8 euint16 euint32 euint64 euint128)
+    value=$(pick_value "$data_type")
+    left_out=none
+    attempt=0
+    while [ "$attempt" -lt 2 ]; do
+      attempt=$((attempt + 1))
+      write_client_config "$left_out"
+      set -- -l -f config.toml --max-iter 120 public-decrypt from-args --to-encrypt "0x$value" \
+        --data-type "$data_type" --key-id "$key_id"
+      [ "$source_epoch" != "$DEFAULT_EPOCH_ID" ] &&
+        set -- "$@" --context-id "$DEFAULT_CONTEXT_ID" --epoch-id "$source_epoch"
+      [ "$(pick async async sync)" = sync ] && set -- "$@" --sync
+      echo "source epoch check, attempt $attempt/2: kms-core-client $*"
+      timeout 300 kms-core-client "$@" >decrypt.out 2>&1
+      drc=$?
+      details="{$inputs,\"check_data_type\":\"$data_type\",\"check_value_hex\":\"$value\",\"check_left_out\":\"$left_out\",\"check_attempt\":$attempt,\"check_exit_code\":$drc"
+      if [ "$drc" -eq 0 ]; then
+        details="$details,\"request_id\":\"$(request_id_from decrypt.out)\"}"
+        assert_always "$MSG_RESHARE_SOURCE_PLAINTEXT" true "$details"
+        [ "$outcome" = failed ] && assert_sometimes "$MSG_RESHARE_SOURCE_AFTER_FAIL" true "$details"
+        break
+      fi
+      if err=$(public_decrypt_wrong_result decrypt.out); then
+        assert_always "$MSG_RESHARE_SOURCE_PLAINTEXT" false "$details,\"error\":\"$(json_str "$err")\"}"
+        cat decrypt.out
+        exit 1
+      fi
+      if [ "$drc" -eq 2 ]; then
+        echo "kms-core-client rejected the arguments"
+        cat decrypt.out
+        exit 1
+      fi
+      # No verdict, which faults allow. A response that fails authentication never comes from a
+      # correct party; the decryption driver asserts on that, here it is only logged.
+      public_decrypt_unauthenticated decrypt.out
+      [ "$outcome" = failed ] &&
+        assert_sometimes "$MSG_RESHARE_SOURCE_AFTER_FAIL" false "$details,\"error\":\"$(json_str "$(tail -n 2 decrypt.out)")\"}"
+      tail -n 3 decrypt.out | cut -c 1-400
+      if ! cli_connected decrypt.out && unreached=$(cli_unreached_party decrypt.out); then
+        left_out=$unreached
+      fi
+      [ "$attempt" -lt 2 ] && sleep 10
+    done
+    exit "$exit_code"
+  eventually_recovers_after_faults.sh: |
+    #!/bin/sh
+    # Checks that once faults stop, every core accepts connections again and the cluster then
+    # serves a public decryption that all four cores answer.
+    #
+    # Faults. Antithesis stops all faults when an eventually_ command starts, kills the other
+    # running commands, and runs nothing alongside it (Test Composer reference, "Eventually
+    # command": "All faults stop across all containers when an eventually command starts"). This
+    # command also opens a quiet window with $ANTITHESIS_STOP_FAULTS that covers its whole check
+    # (the documented way to pause faults from a workload), so the check holds even if the
+    # launcher's pod-fault injector did not follow the eventually phase. A pod deleted just before
+    # faults stopped is recreated by its StatefulSet; nothing here restarts anything.
+    #
+    # Probe. kms-core-client -a public-decrypt with the pod's own four-core config: a fresh value
+    # of a random type under the workload's key and the kms-init epoch (so a failed reshare can't
+    # make it fail), through the async endpoint with result polling or through --sync. -a makes
+    # the CLI wait for all four cores' responses and check each of them, so a success means every
+    # core took part. Each attempt is a new request with a new random request ID; an attempt that
+    # fails has an unknown outcome on the cores, which does not matter because nothing depends on
+    # it. Attempts are bounded by 90 s (and by the time left in the window) and are 10 s apart.
+    #
+    # Windows (Guarantee 2 as written in guarantees.md). The CLI connects to every core before it
+    # sends anything and logs (-l) when it has, which is the client's view of "every core accepts
+    # connections". That must happen within 600 s of this command's start (Kubernetes' restart
+    # back-off cap of 300 s plus boot and readiness). From the start of the first attempt that got
+    # that far, a probe must succeed within 300 s (the deployment's MPC network_timeout). A core
+    # still down when its window ends is a failure, and so is a cluster that accepts connections
+    # but cannot answer. Durations use seconds since boot (/proc/uptime), which clock faults don't
+    # move.
+    #
+    # Checks:
+    # - Always (Guarantee 2): every core accepts client connections within 600 s after faults stop.
+    # - Always (Guarantee 2): a public decryption answered by all four cores succeeds within 300 s
+    #   of every core accepting connections.
+    # - Sometimes (Guarantee 2): a core the client could not connect to after faults stopped
+    #   accepted connections again.
+    # - Sometimes (Guarantee 2): a decryption answered by all four cores succeeded after the first
+    #   attempt failed.
+    # - Always (Guarantee 1, shared with parallel_driver_public_decrypt.sh): a decryption the CLI
+    #   accepts carries the encrypted plaintext.
+    # - Unreachable (Guarantee 1, shared): a response from a KMS party fails authentication.
+    . "$(dirname "$0")/helper_lib.sh"
+    declare_catalog
+
+    CONNECT_BOUND=600
+    DECRYPT_BOUND=300
+    ATTEMPT_LIMIT=90
+    PAUSE=10
+
+    if [ -n "${ANTITHESIS_STOP_FAULTS:-}" ]; then
+      "$ANTITHESIS_STOP_FAULTS" $((CONNECT_BOUND + DECRYPT_BOUND + ATTEMPT_LIMIT + 30)) ||
+        echo "ANTITHESIS_STOP_FAULTS failed; relying on the eventually phase"
+    fi
+
+    start=$(now_s)
+
+    # The key: the one first_generate_key.sh made, or one party 1 published. MinIO is never
+    # pod-faulted, but give its network a moment to settle.
+    tries=0
+    until key_id=$(workload_key_id); do
+      tries=$((tries + 1))
+      if [ "$tries" -ge 6 ]; then
+        echo "no FHE key found; first_generate_key.sh did not produce one, so nothing to probe"
+        exit 0
+      fi
+      sleep "$PAUSE"
+    done
+
+    enter_scratch_dir
+    write_client_config none
+
+    attempt=0
+    failed=0
+    ok=false
+    connected_at=""
+    refused_before_connect=false
+    unreached=""
+    wrong=false
+    last="\"exit_code\":null"
+    while true; do
+      t=$(now_s)
+      if [ -z "$connected_at" ]; then
+        end=$((start + CONNECT_BOUND))
+      else
+        end=$((connected_at + DECRYPT_BOUND))
+      fi
+      left=$((end - t))
+      [ "$left" -gt 0 ] || break
+      limit=$ATTEMPT_LIMIT
+      [ "$left" -lt "$limit" ] && limit=$left
+
+      attempt=$((attempt + 1))
+      data_type=$(pick ebool euint8 euint16 euint32 euint64 euint128 euint160 euint256)
+      value=$(pick_value "$data_type")
+      batch=$(pick 1 1 2)
+      sync=$(pick false true)
+      # --max-iter counts 0.5 s result polls per core.
+      set -- -l -f config.toml --max-iter 60 -a public-decrypt from-args --to-encrypt "0x$value" \
+        --data-type "$data_type" --key-id "$key_id" --batch-size "$batch"
+      [ "$sync" = true ] && set -- "$@" --sync
+      echo "attempt $attempt at +$((t - start)) s (limit $limit s): kms-core-client $*"
+      timeout "$limit" kms-core-client "$@" >cli.out 2>&1
+      rc=$?
+
+      connected=false
+      if cli_connected cli.out; then
+        connected=true
+        [ -n "$connected_at" ] || connected_at=$t
+      fi
+      last="\"attempt\":$attempt,\"started_after_s\":$((t - start)),\"data_type\":\"$data_type\",\"value_hex\":\"$value\",\"batch\":$batch,\"sync\":$sync,\"key_id\":\"$key_id\",\"connected\":$connected,\"exit_code\":$rc"
+
+      if [ "$rc" -eq 0 ]; then
+        ok=true
+        details="{$last,\"request_id\":\"$(request_id_from cli.out)\",\"command\":\"eventually_recovers_after_faults.sh\"}"
+        assert_always "$MSG_PLAINTEXT" true "$details"
+        break
+      fi
+
+      if err=$(public_decrypt_wrong_result cli.out); then
+        wrong=true
+        assert_always "$MSG_PLAINTEXT" false "{$last,\"error\":\"$(json_str "$err")\",\"command\":\"eventually_recovers_after_faults.sh\"}"
+        cat cli.out
+      elif err=$(public_decrypt_unauthenticated cli.out); then
+        wrong=true
+        assert_unreachable "$MSG_UNAUTHENTICATED" "{$last,\"error\":\"$(json_str "$err")\",\"command\":\"eventually_recovers_after_faults.sh\"}"
+        cat cli.out
+      elif [ "$rc" -eq 2 ]; then
+        echo "kms-core-client rejected the arguments"
+        cat cli.out
+        exit 1
+      fi
+
+      failed=$((failed + 1))
+      last="$last,\"error\":\"$(json_str "$(tail -n 2 cli.out)")\""
+      if [ "$connected" = false ] && party=$(cli_unreached_party cli.out); then
+        unreached=$party
+        [ -n "$connected_at" ] || refused_before_connect=true
+        echo "could not connect to party $party"
+      fi
+      tail -n 3 cli.out | cut -c 1-400
+      sleep "$PAUSE"
+    done
+
+    now=$(now_s)
+    summary="\"attempts\":$attempt,\"failed_attempts\":$failed,\"elapsed_s\":$((now - start)),\"last_unreached_party\":\"$unreached\",\"last_attempt\":{$last}"
+    if [ -z "$connected_at" ]; then
+      assert_always "$MSG_RECOVERY_CONNECT" false "{$summary,\"connect_bound_s\":$CONNECT_BOUND}"
+    else
+      connect_wait=$((connected_at - start))
+      assert_always "$MSG_RECOVERY_CONNECT" true "{$summary,\"connect_wait_s\":$connect_wait}"
+      assert_always "$MSG_RECOVERY_DECRYPT" "$ok" \
+        "{$summary,\"connect_wait_s\":$connect_wait,\"decrypt_wait_s\":$((now - connected_at)),\"decrypt_bound_s\":$DECRYPT_BOUND}"
+    fi
+    # Hard cases this run met, judged by whether it got through them.
+    if [ "$refused_before_connect" = true ]; then
+      rejoined=false
+      [ -n "$connected_at" ] && rejoined=true
+      assert_sometimes "$MSG_RECOVERY_REJOINED" "$rejoined" "{$summary}"
+    fi
+    if [ "$failed" -gt 0 ]; then
+      assert_sometimes "$MSG_RECOVERY_RETRIED" "$ok" "{$summary}"
+    fi
+
+    if [ -n "$connected_at" ]; then
+      echo "recovery: all cores accepted connections after $((connected_at - start)) s; decryption ok=$ok after $attempt attempt(s)"
+    else
+      echo "recovery: not every core accepted connections within $CONNECT_BOUND s ($attempt attempts)"
+    fi
+    if [ "$ok" = false ] || [ "$wrong" = true ]; then exit 1; fi
     exit 0
   first_generate_key.sh: |
     #!/bin/sh
@@ -159,13 +433,21 @@ data:
     exit 1
   helper_lib.sh: |
     #!/bin/sh
-    # Shared helpers for the public_decrypt test template. Sourced by the test commands; the
-    # helper_ prefix makes Antithesis skip this file when it picks commands to run.
+    # Shared helpers for the public_decrypt test template: assertions, client configs, randomness.
+    #
+    # Sourced by the test commands; the helper_ prefix makes Antithesis skip this file when it
+    # picks commands to run.
     #
     # Assertions use the Antithesis fallback SDK: one JSON line per message, appended to
     # $ANTITHESIS_OUTPUT_DIR/sdk.jsonl. Outside Antithesis (hand-driving with kubectl exec) they
     # go to /tmp/antithesis-sdk.jsonl instead, and every evaluation is also echoed to stdout.
     # Format: https://antithesis.com/docs/reference/sdk/fallback/assert/
+    # Every evaluation carries the guarantee and property it belongs to in its details
+    # ({"guarantee": "guarantee-<n>", "property": "<slug>"}, see designation_of), and every
+    # message is listed in antithesis/scratchbook/assertion-map.json.
+    #
+    # Checks: none of its own. The assertions are listed in the docstrings of the commands that
+    # evaluate them.
 
     TEMPLATE_DIR=/opt/antithesis/test/v1/public_decrypt
     CLIENT_DIR=/app/kms-core-client # config.toml is written here when the pod starts
@@ -175,6 +457,9 @@ data:
     # directory in its /tmp is enough. The state is lost when the container restarts.
     #   preproc/<key_id>  the preprocessing ID of the key (written by first_generate_key.sh)
     #   epochs            one line per reshare: <epoch_id> <key_id> confirmed|unconfirmed
+    #   profile/<name>    this timeline's draw of a workload knob (timeline_choice)
+    # Losing it is harmless: the commands fall back to MinIO for the key, to the kms-init epoch,
+    # and to fresh draws for the knobs.
     STATE_DIR=/tmp/kms-workload-state
     EPOCHS_FILE="$STATE_DIR/epochs"
 
@@ -202,21 +487,81 @@ data:
     MSG_RESHARE_RESULT="key reshare result from every KMS party matches the reshared key"
     MSG_RESHARE_CHAINED="key reshare succeeded from an epoch that a reshare created"
     MSG_RESHARE_NO_VERDICT="key reshare attempt ended without a verdict"
+    MSG_THREE_CORES="public decryption succeeded through three of the four cores"
+    MSG_RETRY="public decryption succeeded on a retry after an attempt without a verdict"
+    MSG_FAILOVER="public decryption succeeded after the client left out a core it could not connect to"
+    MSG_RECOVERY_CONNECT="every core accepts client connections within 600 s after faults stop"
+    MSG_RECOVERY_DECRYPT="public decryption answered by all four cores succeeds within 300 s of every core accepting connections"
+    MSG_RECOVERY_REJOINED="a core the client could not connect to after faults stopped accepted connections again"
+    MSG_RECOVERY_RETRIED="public decryption answered by all four cores succeeded after a failed first attempt once faults stopped"
+    MSG_RESHARED_PLAINTEXT="public decryption under a reshared epoch carries the encrypted plaintext"
+    MSG_RESHARE_PUBLIC_KEY="public key that every party publishes for a key is unchanged by a reshare"
+    MSG_RESHARE_PUBLIC_KEY_FAILED="public key read back unchanged after a reshare that ended without a verdict"
+    MSG_RESHARE_SOURCE_PLAINTEXT="public decryption under a reshare's source epoch carries the encrypted plaintext after the reshare"
+    MSG_RESHARE_SOURCE_AFTER_FAIL="public decryption under the source epoch succeeded after a reshare that ended without a verdict"
+    MSG_USER_PLAINTEXT="user decryption reconstructs the encrypted plaintext"
+    MSG_USER_RESHARED_PLAINTEXT="user decryption under a reshared epoch reconstructs the encrypted plaintext"
+    MSG_USER_RETRY="user decryption succeeded on a retry after an attempt without a verdict"
+    MSG_USER_RESHARED="user decryption succeeded under a reshared epoch"
+    MSG_USER_BATCH="batched user decryption succeeded"
+    MSG_USER_SYNC="user decryption succeeded through the sync endpoint"
+    MSG_USER_ALL_PARTIES="user decryption succeeded with every party's response collected"
+    MSG_USER_SERVER_SNS="user decryption succeeded with SnS left to the cores"
+    MSG_USER_NO_VERDICT="user decryption attempt ended without a verdict"
 
     # The command an assertion lives in. Declaration and evaluation must carry the same location.
     location_of() {
       case "$1" in
         "$MSG_KEYGEN") echo "$TEMPLATE_DIR/first_generate_key.sh" ;;
-        "$MSG_RESHARE_RESULT" | "$MSG_RESHARE_CHAINED" | "$MSG_RESHARE_NO_VERDICT")
+        "$MSG_RESHARE_RESULT" | "$MSG_RESHARE_CHAINED" | "$MSG_RESHARE_NO_VERDICT" | \
+          "$MSG_RESHARE_PUBLIC_KEY" | "$MSG_RESHARE_PUBLIC_KEY_FAILED" | \
+          "$MSG_RESHARE_SOURCE_PLAINTEXT" | "$MSG_RESHARE_SOURCE_AFTER_FAIL")
           echo "$TEMPLATE_DIR/anytime_reshare_key.sh" ;;
+        "$MSG_USER_PLAINTEXT" | "$MSG_USER_RESHARED_PLAINTEXT" | "$MSG_USER_RETRY" | "$MSG_USER_RESHARED" | \
+          "$MSG_USER_BATCH" | "$MSG_USER_SYNC" | "$MSG_USER_ALL_PARTIES" | "$MSG_USER_SERVER_SNS" | \
+          "$MSG_USER_NO_VERDICT")
+          echo "$TEMPLATE_DIR/parallel_driver_user_decrypt.sh" ;;
+        "$MSG_RECOVERY_CONNECT" | "$MSG_RECOVERY_DECRYPT" | "$MSG_RECOVERY_REJOINED" | "$MSG_RECOVERY_RETRIED")
+          echo "$TEMPLATE_DIR/eventually_recovers_after_faults.sh" ;;
         *) echo "$TEMPLATE_DIR/parallel_driver_public_decrypt.sh" ;;
       esac
     }
 
+    # The guarantee and property an assertion checks, as JSON members for its details. A message
+    # missing here gets nulls, which assertion-map.json then has to explain.
+    designation_of() {
+      case "$1" in
+        "$MSG_PLAINTEXT" | "$MSG_UNAUTHENTICATED" | "$MSG_ALL_PARTIES" | "$MSG_SYNC" | "$MSG_BATCH" | \
+          "$MSG_SERVER_SNS" | "$MSG_NO_VERDICT" | "$MSG_THREE_CORES" | "$MSG_RETRY" | "$MSG_FAILOVER")
+          echo '"guarantee":"guarantee-1","property":"public-decrypt-returns-encrypted-plaintext"' ;;
+        "$MSG_RECOVERY_CONNECT" | "$MSG_RECOVERY_DECRYPT" | "$MSG_RECOVERY_REJOINED" | "$MSG_RECOVERY_RETRIED")
+          echo '"guarantee":"guarantee-2","property":"recovers-after-faults"' ;;
+        "$MSG_RESHARED_DECRYPT" | "$MSG_RESHARE_RESULT" | "$MSG_RESHARE_CHAINED" | "$MSG_RESHARE_NO_VERDICT" | \
+          "$MSG_RESHARED_PLAINTEXT" | "$MSG_RESHARE_PUBLIC_KEY" | "$MSG_RESHARE_PUBLIC_KEY_FAILED" | \
+          "$MSG_RESHARE_SOURCE_PLAINTEXT" | "$MSG_RESHARE_SOURCE_AFTER_FAIL" | "$MSG_USER_RESHARED_PLAINTEXT")
+          echo '"guarantee":"guarantee-3","property":"reshare-preserves-key"' ;;
+        "$MSG_USER_PLAINTEXT" | "$MSG_USER_RETRY" | "$MSG_USER_RESHARED" | "$MSG_USER_BATCH" | "$MSG_USER_SYNC" | \
+          "$MSG_USER_ALL_PARTIES" | "$MSG_USER_SERVER_SNS" | "$MSG_USER_NO_VERDICT")
+          echo '"guarantee":"guarantee-4","property":"user-decrypt-returns-encrypted-plaintext"' ;;
+        *) echo '"guarantee":null,"property":null' ;;
+      esac
+    }
+
     # sdk_emit HIT MUST_HIT ASSERT_TYPE DISPLAY_TYPE MESSAGE CONDITION [DETAILS_JSON]
+    # Declarations (HIT false) carry no details. Evaluations get the message's designation added
+    # at the front of DETAILS_JSON, which must be a JSON object if given.
     sdk_emit() {
-      local details=""
-      [ -n "$7" ] && details=",\"details\":$7"
+      local details="" rest
+      if [ "$1" = true ]; then
+        # DETAILS_JSON without its opening brace, or nothing for no details or {}.
+        rest=${7#\{}
+        [ "$rest" = "}" ] && rest=""
+        if [ -n "$rest" ]; then
+          details=",\"details\":{$(designation_of "$5"),$rest"
+        else
+          details=",\"details\":{$(designation_of "$5")}"
+        fi
+      fi
       printf '{"antithesis_assert":{"hit":%s,"must_hit":%s,"assert_type":"%s","display_type":"%s","message":"%s","condition":%s,"id":"%s","location":{"class":"","function":"","file":"%s","begin_line":0,"begin_column":0}%s}}\n' \
         "$1" "$2" "$3" "$4" "$5" "$6" "$5" "$(location_of "$5")" "$details" >>"$SDK_FILE"
     }
@@ -238,6 +583,27 @@ data:
       sdk_emit false true always Always "$MSG_RESHARE_RESULT" false
       sdk_emit false true reachability Reachable "$MSG_RESHARE_CHAINED" false
       sdk_emit false true reachability Reachable "$MSG_RESHARE_NO_VERDICT" false
+      sdk_emit false true reachability Reachable "$MSG_THREE_CORES" false
+      sdk_emit false true sometimes Sometimes "$MSG_RETRY" false
+      sdk_emit false true sometimes Sometimes "$MSG_FAILOVER" false
+      sdk_emit false true always Always "$MSG_RECOVERY_CONNECT" false
+      sdk_emit false true always Always "$MSG_RECOVERY_DECRYPT" false
+      sdk_emit false true sometimes Sometimes "$MSG_RECOVERY_REJOINED" false
+      sdk_emit false true sometimes Sometimes "$MSG_RECOVERY_RETRIED" false
+      sdk_emit false false always AlwaysOrUnreachable "$MSG_RESHARED_PLAINTEXT" false
+      sdk_emit false true always Always "$MSG_RESHARE_PUBLIC_KEY" false
+      sdk_emit false true sometimes Sometimes "$MSG_RESHARE_PUBLIC_KEY_FAILED" false
+      sdk_emit false true always Always "$MSG_RESHARE_SOURCE_PLAINTEXT" false
+      sdk_emit false true sometimes Sometimes "$MSG_RESHARE_SOURCE_AFTER_FAIL" false
+      sdk_emit false true always Always "$MSG_USER_PLAINTEXT" false
+      sdk_emit false false always AlwaysOrUnreachable "$MSG_USER_RESHARED_PLAINTEXT" false
+      sdk_emit false true sometimes Sometimes "$MSG_USER_RETRY" false
+      sdk_emit false true sometimes Sometimes "$MSG_USER_RESHARED" false
+      sdk_emit false true sometimes Sometimes "$MSG_USER_BATCH" false
+      sdk_emit false true reachability Reachable "$MSG_USER_SYNC" false
+      sdk_emit false true reachability Reachable "$MSG_USER_ALL_PARTIES" false
+      sdk_emit false true reachability Reachable "$MSG_USER_SERVER_SNS" false
+      sdk_emit false true reachability Reachable "$MSG_USER_NO_VERDICT" false
       touch "$marker"
     }
 
@@ -245,6 +611,19 @@ data:
     assert_always() {
       echo "[assert] Always \"$1\": $2"
       sdk_emit true true always Always "$1" "$2" "$3"
+    }
+
+    # assert_always_or_unreachable MESSAGE true|false DETAILS_JSON: an Always that does not fail
+    # when it is never evaluated. Used where a Reachable already demands that the case happens.
+    assert_always_or_unreachable() {
+      echo "[assert] AlwaysOrUnreachable \"$1\": $2"
+      sdk_emit true false always AlwaysOrUnreachable "$1" "$2" "$3"
+    }
+
+    # assert_sometimes MESSAGE true|false DETAILS_JSON
+    assert_sometimes() {
+      echo "[assert] Sometimes \"$1\": $2"
+      sdk_emit true true sometimes Sometimes "$1" "$2" "$3"
     }
 
     # assert_reachable MESSAGE DETAILS_JSON
@@ -395,20 +774,197 @@ data:
     key_digest() {
       { printf PDAT_KEY; cat "$1"; } | openssl dgst -shake256 -xoflen 32 -r | cut -d ' ' -f 1
     }
+
+    # now_s: whole seconds since boot. Durations are measured with it rather than the wall clock,
+    # which clock faults move.
+    now_s() {
+      cut -d. -f1 /proc/uptime
+    }
+
+    # chance PERCENT: succeeds with probability PERCENT/100.
+    chance() {
+      [ "$(rand_below 100)" -lt "$1" ]
+    }
+
+    # timeline_choice NAME OPTION...: one of the OPTIONs, drawn on the first call in a timeline
+    # and then kept, so that each timeline leans its own way (swarm testing). Concurrent first
+    # calls can draw different values; the first one stored wins.
+    timeline_choice() {
+      local name=$1 file
+      shift
+      file="$STATE_DIR/profile/$name"
+      if [ ! -s "$file" ]; then
+        mkdir -p "$STATE_DIR/profile"
+        pick "$@" >"$file.$$"
+        mv -n "$file.$$" "$file"
+        rm -f "$file.$$"
+      fi
+      cat "$file"
+    }
+
+    # write_client_config LEFT_OUT: write ./config.toml for kms-core-client. LEFT_OUT is none for
+    # the pod's own config (all four cores), or a party ID to leave that core out. The CLI
+    # connects to every core in its config before it sends a request, so a three-core config is
+    # how a client keeps decrypting while one core does not accept connections. num_parties = 4
+    # keeps the party IDs and the threshold those of the four-party deployment.
+    write_client_config() {
+      if [ "$1" = none ]; then
+        cp "$CLIENT_DIR/config.toml" config.toml
+        return
+      fi
+      awk -v skip="$1" '
+        function flush() {
+          if (block != "" && !drop) printf "%s", block
+          block = ""
+          drop = 0
+        }
+        /^\[\[cores\]\]/ {
+          flush()
+          if (!added) { print "num_parties = 4"; added = 1 }
+          in_cores = 1
+        }
+        in_cores {
+          block = block $0 "\n"
+          if ($0 ~ "^party_id *= *" skip " *$") drop = 1
+          next
+        }
+        { print }
+        END { flush() }
+      ' "$CLIENT_DIR/config.toml" >config.toml
+    }
+
+    # cli_connected FILE: whether the kms-core-client run logged in FILE (run with -l) connected
+    # to every core in its config. It connects to them one by one before sending anything.
+    cli_connected() {
+      grep -q 'Threshold Client setup done' "$1"
+    }
+
+    # cli_unreached_party FILE: the party ID of the core that a run which did not get past
+    # connecting was connecting to when it failed or was stopped. Fails when it never started
+    # connecting (e.g. it could not read the verification keys from MinIO).
+    cli_unreached_party() {
+      local party
+      party=$(sed -n 's/.*Connecting to party \([0-9]*\) via URL.*/\1/p' "$1" | tail -n 1)
+      [ -n "$party" ] || return 1
+      echo "$party"
+    }
+
+    # public_decrypt_wrong_result FILE: print the first error in FILE that the CLI raises only
+    # when a validly signed response carries a wrong plaintext, a wrong plaintext count or type,
+    # or a wrong request ID. Fails when there is none. Sources: the plaintext check in
+    # core-client/src/decrypt.rs and validate_public_decrypt_responses in
+    # core/service/src/engine/validation_non_wasm.rs.
+    public_decrypt_wrong_result() {
+      grep -m 1 \
+        -e 'decryption result mismatch' \
+        -e 'Cannot find public decryption pivot' \
+        -e 'Not enough agreeing public decryption responses' \
+        -e 'The number of ciphertexts in the public decryption response is wrong' \
+        -e 'Plaintext type mismatch in public decryption response' \
+        -e 'The public decryption response is not linked to the correct public decryption request' \
+        -e 'Request ID is not set in public decryption response' \
+        "$1"
+    }
+
+    # public_decrypt_unauthenticated FILE: print the CLI's error for too few responses that pass
+    # authentication. A response that fails authentication never comes from a correct party; one
+    # case is a response for another request, whose signature does not cover this request's
+    # handles.
+    public_decrypt_unauthenticated() {
+      grep -m 1 'Not enough authenticated public decryption responses' "$1"
+    }
+
+    # workload_key_id: the key that first_generate_key.sh generated in this timeline, or, when
+    # that record is lost, a key that party 1 has published.
+    workload_key_id() {
+      local keys
+      keys=$(ls "$STATE_DIR/preproc" 2>/dev/null)
+      if [ -n "$keys" ]; then
+        pick $keys
+        return
+      fi
+      find_key_id
+    }
+
+    # fetch_public OBJECT OUT: download OBJECT (a path in the kms-public bucket) to OUT and print
+    # ok, missing (MinIO answered 404) or unread (anything else, e.g. a network fault). Bounded,
+    # so a partition from MinIO costs at most about a minute.
+    fetch_public() {
+      if wget -S -q -O "$2" --timeout=20 --tries=3 "$S3_PUBLIC/$1" 2>"$2.hdr"; then
+        echo ok
+      elif grep -q 'HTTP/[0-9.]* 404' "$2.hdr"; then
+        echo missing
+      else
+        echo unread
+      fi
+    }
+
+    # public_key_digests KEY_ID TAG: one word per party, p<i>=<digest>, p<i>=missing or
+    # p<i>=unread, for the PublicKey object that party i publishes for KEY_ID. TAG names the
+    # downloaded files, so two reads in one directory do not clash.
+    public_key_digests() {
+      local p out
+      for p in 1 2 3 4; do
+        out=pk-$2-p$p.bin
+        case $(fetch_public "PUB-p$p/PublicKey/$1" "$out") in
+          ok) printf 'p%s=%s ' "$p" "$(key_digest "$out")" ;;
+          missing) printf 'p%s=missing ' "$p" ;;
+          *) printf 'p%s=unread ' "$p" ;;
+        esac
+      done
+    }
+
+    # user_decrypt_wrong_result FILE: print the CLI's error for authenticated user-decryption
+    # shares that reconstructed a plaintext other than the encrypted one (reconstruct_user_decrypt
+    # in core-client/src/decrypt.rs). Fails when there is none. Too few responses, failed
+    # authentication and failed reconstruction are errors, not wrong results.
+    user_decrypt_wrong_result() {
+      grep -m 1 'user decryption result mismatch' "$1"
+    }
   parallel_driver_public_decrypt.sh: |
     #!/bin/sh
-    # Runs one public decryption of a fresh value and turns the outcome into assertions.
+    # Runs one public decryption of a fresh value, retrying when an attempt ends without a verdict.
     #
     # kms-core-client does the checking. It encrypts the value under the cluster's public key and
-    # sends the request to all four cores. It collects 2 responses (all 4 with -a) and checks their
-    # signatures, their agreement and their request link. It then compares every collected
-    # plaintext with the encrypted value. This script picks the inputs at random and classifies
-    # the exit of the CLI. A wrong result is a property failure. Any other error is a transient
-    # failure, which is expected under faults.
+    # sends the request to the cores in its config. It collects 2 responses (every configured
+    # core's with -a) and checks their signatures, their agreement and their request link. It then
+    # compares every collected plaintext with the encrypted value. This script picks the inputs at
+    # random and classifies the exit of the CLI. A wrong result is a property failure. Any other
+    # error is an attempt without a verdict, which is expected under faults: the request may or
+    # may not still complete on the cores, and nothing here depends on which.
     #
-    # Until anytime_reshare_key.sh reshares the key, every run decrypts under the kms-init epoch.
-    # After that, up to 3 runs in 5 decrypt under a reshared epoch instead (see pick_epoch), so
-    # the same check covers the shares that a reshare produced.
+    # Inputs: FHE type and value (zero, one, max, top bit, random), batch size, compressed or not,
+    # SnS precomputed by the client or left to the cores, the async endpoint with result polling
+    # or the sync endpoint, and the epoch. Until anytime_reshare_key.sh reshares the key, every
+    # run decrypts under the kms-init epoch. After that, up to 3 runs in 5 decrypt under a
+    # reshared epoch instead (see pick_epoch), so the same check covers the shares that a reshare
+    # produced.
+    #
+    # Cores. The CLI connects to every core in its config before it sends anything, so while one
+    # core does not accept connections a four-core config fails before reaching the cluster. A run
+    # therefore starts either with all four cores or with three (a random one left out, still
+    # num_parties = 4). -a is used only with four cores: with three it would wait for a fourth
+    # response that never comes. How often a run uses three cores, -a and --sync is drawn once per
+    # timeline (timeline_choice), so some timelines lean one way and some the other.
+    #
+    # Retries. A run makes up to 3 attempts. Each attempt is a new CLI run, so a new random request
+    # ID and a fresh encryption of the same value; a request ID is never reused here (that is
+    # Guarantee 5). An attempt without a verdict is retried after 10 s. If it did not get past
+    # connecting, the CLI's log (-l) names the core it was connecting to, and the next attempt
+    # leaves that core out, as a client would fail over to the cores it can reach.
+    #
+    # Checks (Guarantee 1; the reshared-epoch checks are Guarantee 3):
+    # - Always: a public decryption the CLI accepts carries the encrypted plaintext, and the CLI
+    #   never fails with an error that only a validly signed wrong result causes.
+    # - AlwaysOrUnreachable (Guarantee 3): the same check for decryptions under a reshared epoch,
+    #   confirmed or not, so a wrong plaintext there also counts against the reshare.
+    # - Unreachable: a response from a KMS party fails authentication.
+    # - Sometimes: a decryption succeeded on a retry after an attempt without a verdict (judged on
+    #   every retry).
+    # - Sometimes: a decryption succeeded after the client left out a core it could not connect to
+    #   (judged on every attempt that fails over).
+    # - Reachable: a decryption succeeded with -a, with --sync, with a batch, with SnS left to the
+    #   cores, through three cores, and under a reshared epoch; an attempt ended without a verdict.
     . "$(dirname "$0")/helper_lib.sh"
     declare_catalog
 
@@ -423,70 +979,243 @@ data:
     data_type=$(pick ebool euint8 euint16 euint32 euint64 euint128 euint160 euint256)
     value=$(pick_value "$data_type")
     batch=$(pick 1 1 1 2 3)
-    all_parties=$(pick false false true)
-    sync=$(pick false true)
     no_compression=$(pick false false false true)
     no_sns=$(pick false false false true)
-
-    # --max-iter counts 0.5 s result polls per party.
-    set -- -f config.toml --max-iter 120
-    [ "$all_parties" = true ] && set -- "$@" -a
-    set -- "$@" public-decrypt from-args --to-encrypt "0x$value" --data-type "$data_type" \
-      --key-id "$key_id" --batch-size "$batch"
-    [ "$epoch_status" != default ] &&
-      set -- "$@" --context-id "$DEFAULT_CONTEXT_ID" --epoch-id "$epoch_id"
-    [ "$sync" = true ] && set -- "$@" --sync
-    [ "$no_compression" = true ] && set -- "$@" --no-compression
-    [ "$no_sns" = true ] && set -- "$@" --no-precompute-sns
+    sync=false
+    chance "$(timeline_choice sync_pct 10 50 90)" && sync=true
+    all_parties_pct=$(timeline_choice all_parties_pct 0 33 90)
+    left_out=none
+    chance "$(timeline_choice three_core_pct 0 25 50 90)" && left_out=$(pick 1 2 3 4)
+    max_attempts=$(pick 1 2 3 3)
 
     enter_scratch_dir
-    echo "kms-core-client $*"
-    timeout 300 kms-core-client "$@" >cli.out 2>&1
-    rc=$?
 
-    inputs="\"data_type\":\"$data_type\",\"value_hex\":\"$value\",\"batch\":$batch,\"all_parties\":$all_parties,\"sync\":$sync,\"no_compression\":$no_compression,\"no_precompute_sns\":$no_sns,\"key_id\":\"$key_id\",\"epoch_id\":\"$epoch_id\",\"epoch_status\":\"$epoch_status\",\"exit_code\":$rc"
+    attempt=0
+    failed=0
+    ok=false
+    fail_over=false # the next attempt leaves out a core that the last one could not connect to
+    while [ "$attempt" -lt "$max_attempts" ]; do
+      attempt=$((attempt + 1))
+      failing_over=$fail_over
+      fail_over=false
+      write_client_config "$left_out"
+      all_parties=false
+      if [ "$left_out" = none ] && chance "$all_parties_pct"; then all_parties=true; fi
 
-    # Errors that the CLI raises only when a validly signed response carries a wrong plaintext,
-    # a wrong plaintext count or type, or a wrong request ID. Sources: the plaintext check in
-    # core-client/src/decrypt.rs and validate_public_decrypt_responses in
-    # core/service/src/engine/validation_non_wasm.rs.
-    wrong_result() {
-      grep -m 1 \
-        -e 'decryption result mismatch' \
-        -e 'Cannot find public decryption pivot' \
-        -e 'Not enough agreeing public decryption responses' \
-        -e 'The number of ciphertexts in the public decryption response is wrong' \
-        -e 'Plaintext type mismatch in public decryption response' \
-        -e 'The public decryption response is not linked to the correct public decryption request' \
-        -e 'Request ID is not set in public decryption response' \
-        cli.out
-    }
+      # --max-iter counts 0.5 s result polls per core.
+      set -- -l -f config.toml --max-iter 120
+      [ "$all_parties" = true ] && set -- "$@" -a
+      set -- "$@" public-decrypt from-args --to-encrypt "0x$value" --data-type "$data_type" \
+        --key-id "$key_id" --batch-size "$batch"
+      [ "$epoch_status" != default ] &&
+        set -- "$@" --context-id "$DEFAULT_CONTEXT_ID" --epoch-id "$epoch_id"
+      [ "$sync" = true ] && set -- "$@" --sync
+      [ "$no_compression" = true ] && set -- "$@" --no-compression
+      [ "$no_sns" = true ] && set -- "$@" --no-precompute-sns
 
-    if [ "$rc" -eq 0 ]; then
-      details="{$inputs,\"request_id\":\"$(request_id_from cli.out)\"}"
-      assert_always "$MSG_PLAINTEXT" true "$details"
-      if [ "$all_parties" = true ]; then assert_reachable "$MSG_ALL_PARTIES" "$details"; fi
-      if [ "$sync" = true ]; then assert_reachable "$MSG_SYNC" "$details"; fi
-      if [ "$batch" -gt 1 ]; then assert_reachable "$MSG_BATCH" "$details"; fi
-      if [ "$no_sns" = true ]; then assert_reachable "$MSG_SERVER_SNS" "$details"; fi
-      if [ "$epoch_status" != default ]; then assert_reachable "$MSG_RESHARED_DECRYPT" "$details"; fi
+      echo "attempt $attempt/$max_attempts: kms-core-client $*"
+      timeout 300 kms-core-client "$@" >cli.out 2>&1
+      rc=$?
+
+      inputs="\"data_type\":\"$data_type\",\"value_hex\":\"$value\",\"batch\":$batch,\"all_parties\":$all_parties,\"left_out\":\"$left_out\",\"sync\":$sync,\"no_compression\":$no_compression,\"no_precompute_sns\":$no_sns,\"key_id\":\"$key_id\",\"epoch_id\":\"$epoch_id\",\"epoch_status\":\"$epoch_status\",\"attempt\":$attempt,\"failed_attempts\":$failed,\"exit_code\":$rc"
+
+      if [ "$rc" -eq 0 ]; then
+        ok=true
+        details="{$inputs,\"request_id\":\"$(request_id_from cli.out)\"}"
+        if [ "$attempt" -gt 1 ]; then assert_sometimes "$MSG_RETRY" true "$details"; fi
+        if [ "$failing_over" = true ]; then assert_sometimes "$MSG_FAILOVER" true "$details"; fi
+        assert_always "$MSG_PLAINTEXT" true "$details"
+        if [ "$all_parties" = true ]; then assert_reachable "$MSG_ALL_PARTIES" "$details"; fi
+        if [ "$left_out" != none ]; then assert_reachable "$MSG_THREE_CORES" "$details"; fi
+        if [ "$sync" = true ]; then assert_reachable "$MSG_SYNC" "$details"; fi
+        if [ "$batch" -gt 1 ]; then assert_reachable "$MSG_BATCH" "$details"; fi
+        if [ "$no_sns" = true ]; then assert_reachable "$MSG_SERVER_SNS" "$details"; fi
+        if [ "$epoch_status" != default ]; then
+          assert_always_or_unreachable "$MSG_RESHARED_PLAINTEXT" true "$details"
+          assert_reachable "$MSG_RESHARED_DECRYPT" "$details"
+        fi
+        break
+      fi
+
+      if err=$(public_decrypt_wrong_result cli.out); then
+        assert_always "$MSG_PLAINTEXT" false "{$inputs,\"error\":\"$(json_str "$err")\"}"
+        if [ "$epoch_status" != default ]; then
+          assert_always_or_unreachable "$MSG_RESHARED_PLAINTEXT" false "{$inputs,\"error\":\"$(json_str "$err")\"}"
+        fi
+        cat cli.out
+        exit 1
+      fi
+
+      if err=$(public_decrypt_unauthenticated cli.out); then
+        assert_unreachable "$MSG_UNAUTHENTICATED" "{$inputs,\"error\":\"$(json_str "$err")\"}"
+        cat cli.out
+        exit 1
+      fi
+
+      # The CLI's argument parser exits with 2, so this script built a malformed command.
+      if [ "$rc" -eq 2 ]; then
+        echo "kms-core-client rejected the arguments"
+        cat cli.out
+        exit 1
+      fi
+
+      # No verdict: a timeout, a transport error, or cores that answered with errors.
+      failed=$((failed + 1))
+      connected=true
+      cli_connected cli.out || connected=false
+      details="{$inputs,\"connected\":$connected,\"error\":\"$(json_str "$(tail -n 2 cli.out)")\"}"
+      assert_reachable "$MSG_NO_VERDICT" "$details"
+      if [ "$attempt" -gt 1 ]; then assert_sometimes "$MSG_RETRY" false "$details"; fi
+      if [ "$failing_over" = true ]; then assert_sometimes "$MSG_FAILOVER" false "$details"; fi
+      tail -n 5 cli.out | cut -c 1-400
+      if [ "$connected" = false ] && unreached=$(cli_unreached_party cli.out); then
+        echo "could not connect to party $unreached; the next attempt leaves it out"
+        left_out=$unreached
+        fail_over=true
+      fi
+      [ "$attempt" -lt "$max_attempts" ] && sleep 10
+    done
+
+    echo "public decryption: ok=$ok after $attempt attempt(s), $failed without a verdict"
+    exit 0
+  parallel_driver_user_decrypt.sh: |
+    #!/bin/sh
+    # Runs one user decryption of a fresh value, retrying when an attempt ends without a verdict.
+    #
+    # kms-core-client does the checking. It encrypts the value under the cluster's public key,
+    # sends a user-decryption request with a fresh request ID and a fresh ephemeral ML-KEM key to
+    # the four cores, and collects 3 responses (all four with -a). It authenticates each response
+    # (signature, link to the request, agreement on degree and slot metadata), un-signcrypts the
+    # shares, reconstructs the plaintext with error correction and compares it with the encrypted
+    # value. Only that comparison's error, "user decryption result mismatch", means authenticated
+    # shares rebuilt a wrong value; this script classifies the CLI's exit on it. Every other error
+    # (too few responses, failed authentication or reconstruction, transport errors, timeouts) is
+    # an attempt without a verdict, which the guarantee allows ("the value or an error"). Its
+    # outcome on the cores is unknown and nothing here depends on it.
+    #
+    # Inputs: FHE type and value (zero, one, max, top bit, random), batch size, compressed or not,
+    # SnS precomputed by the client or left to the cores, the async endpoint with result polling
+    # or the sync endpoint, -a or not, and the epoch: the kms-init epoch, or after
+    # anytime_reshare_key.sh has run, up to 3 runs in 5 under a reshared epoch (pick_epoch). How
+    # often a run uses --sync and -a is drawn once per timeline (timeline_choice).
+    #
+    # Cores. Unlike public decryption, user decryption always uses the pod's four-core config. The
+    # client derives the threshold from the cores in its config, (n - 1) / 3, so with three it
+    # expects degree-0 shares and rejects the cores' degree-1 shares (UserDecTrustedValidationContext
+    # and the pivot check in core/service/src/engine/validation_wasm.rs). While a core does not
+    # accept connections, every attempt therefore fails at connect, which is an allowed error.
+    #
+    # Retries. A run makes up to 3 attempts, 10 s apart. Each attempt is a new CLI run, so a new
+    # request ID, a new ephemeral key and a fresh encryption of the same value.
+    #
+    # Checks (Guarantee 4; the reshared-epoch check is Guarantee 3):
+    # - Always: a user decryption the CLI completes reconstructs the encrypted plaintext; the CLI
+    #   never reports a result mismatch.
+    # - AlwaysOrUnreachable (Guarantee 3): the same check for decryptions under a reshared epoch.
+    # - Sometimes: a decryption succeeded on a retry after an attempt without a verdict (judged on
+    #   every retry).
+    # - Sometimes: a decryption under a reshared epoch succeeded (judged on every such attempt).
+    # - Sometimes: a batched decryption succeeded (judged on every batched attempt).
+    # - Reachable: a decryption succeeded with -a, with --sync, with SnS left to the cores; an
+    #   attempt ended without a verdict.
+    . "$(dirname "$0")/helper_lib.sh"
+    declare_catalog
+
+    if ! key_id=$(find_key_id); then
+      echo "no FHE key published in MinIO yet; nothing to decrypt"
       exit 0
     fi
 
-    if err=$(wrong_result); then
-      assert_always "$MSG_PLAINTEXT" false "{$inputs,\"error\":\"$(json_str "$err")\"}"
-      cat cli.out
-      exit 1
-    fi
+    epoch=$(pick_epoch "$key_id")
+    epoch_id=${epoch% *}
+    epoch_status=${epoch#* }
+    data_type=$(pick ebool euint8 euint16 euint32 euint64 euint128 euint160 euint256)
+    value=$(pick_value "$data_type")
+    batch=$(pick 1 1 1 2 3)
+    no_compression=$(pick false false false true)
+    no_sns=$(pick false false false true)
+    sync=false
+    chance "$(timeline_choice user_sync_pct 10 50 90)" && sync=true
+    all_parties_pct=$(timeline_choice user_all_parties_pct 0 33 90)
+    max_attempts=$(pick 1 2 3 3)
 
-    # A response that fails authentication never comes from a correct party. One case is a
-    # response for another request, whose signature does not cover this request's handles.
-    if err=$(grep -m 1 'Not enough authenticated public decryption responses' cli.out); then
-      assert_unreachable "$MSG_UNAUTHENTICATED" "{$inputs,\"error\":\"$(json_str "$err")\"}"
-      cat cli.out
-      exit 1
-    fi
+    enter_scratch_dir
 
-    assert_reachable "$MSG_NO_VERDICT" "{$inputs,\"error\":\"$(json_str "$(tail -n 3 cli.out)")\"}"
-    tail -n 20 cli.out
+    attempt=0
+    failed=0
+    ok=false
+    while [ "$attempt" -lt "$max_attempts" ]; do
+      attempt=$((attempt + 1))
+      all_parties=false
+      chance "$all_parties_pct" && all_parties=true
+
+      # --max-iter counts 0.5 s result polls per core.
+      set -- -l -f config.toml --max-iter 120
+      [ "$all_parties" = true ] && set -- "$@" -a
+      set -- "$@" user-decrypt from-args --to-encrypt "0x$value" --data-type "$data_type" \
+        --key-id "$key_id" --batch-size "$batch"
+      [ "$epoch_status" != default ] &&
+        set -- "$@" --context-id "$DEFAULT_CONTEXT_ID" --epoch-id "$epoch_id"
+      [ "$sync" = true ] && set -- "$@" --sync
+      [ "$no_compression" = true ] && set -- "$@" --no-compression
+      [ "$no_sns" = true ] && set -- "$@" --no-precompute-sns
+
+      echo "attempt $attempt/$max_attempts: kms-core-client $*"
+      timeout 300 kms-core-client "$@" >cli.out 2>&1
+      rc=$?
+
+      inputs="\"data_type\":\"$data_type\",\"value_hex\":\"$value\",\"batch\":$batch,\"all_parties\":$all_parties,\"sync\":$sync,\"no_compression\":$no_compression,\"no_precompute_sns\":$no_sns,\"key_id\":\"$key_id\",\"epoch_id\":\"$epoch_id\",\"epoch_status\":\"$epoch_status\",\"attempt\":$attempt,\"failed_attempts\":$failed,\"exit_code\":$rc"
+
+      if [ "$rc" -eq 0 ]; then
+        ok=true
+        details="{$inputs,\"request_id\":\"$(request_id_from cli.out)\"}"
+        assert_always "$MSG_USER_PLAINTEXT" true "$details"
+        if [ "$epoch_status" != default ]; then
+          assert_always_or_unreachable "$MSG_USER_RESHARED_PLAINTEXT" true "$details"
+          assert_sometimes "$MSG_USER_RESHARED" true "$details"
+        fi
+        if [ "$attempt" -gt 1 ]; then assert_sometimes "$MSG_USER_RETRY" true "$details"; fi
+        if [ "$batch" -gt 1 ]; then assert_sometimes "$MSG_USER_BATCH" true "$details"; fi
+        if [ "$all_parties" = true ]; then assert_reachable "$MSG_USER_ALL_PARTIES" "$details"; fi
+        if [ "$sync" = true ]; then assert_reachable "$MSG_USER_SYNC" "$details"; fi
+        if [ "$no_sns" = true ]; then assert_reachable "$MSG_USER_SERVER_SNS" "$details"; fi
+        break
+      fi
+
+      if err=$(user_decrypt_wrong_result cli.out); then
+        details="{$inputs,\"error\":\"$(json_str "$err")\"}"
+        assert_always "$MSG_USER_PLAINTEXT" false "$details"
+        if [ "$epoch_status" != default ]; then
+          assert_always_or_unreachable "$MSG_USER_RESHARED_PLAINTEXT" false "$details"
+        fi
+        cat cli.out
+        exit 1
+      fi
+
+      # The CLI's argument parser exits with 2, so this script built a malformed command.
+      if [ "$rc" -eq 2 ]; then
+        echo "kms-core-client rejected the arguments"
+        cat cli.out
+        exit 1
+      fi
+
+      # No verdict: a timeout, a transport error, too few responses, or responses that failed
+      # authentication or reconstruction. The last two should not come from honest cores that
+      # only crash or lose messages, so they are logged for triage.
+      failed=$((failed + 1))
+      connected=true
+      cli_connected cli.out || connected=false
+      details="{$inputs,\"connected\":$connected,\"error\":\"$(json_str "$(tail -n 2 cli.out)")\"}"
+      assert_reachable "$MSG_USER_NO_VERDICT" "$details"
+      if [ "$attempt" -gt 1 ]; then assert_sometimes "$MSG_USER_RETRY" false "$details"; fi
+      if [ "$epoch_status" != default ]; then assert_sometimes "$MSG_USER_RESHARED" false "$details"; fi
+      if [ "$batch" -gt 1 ]; then assert_sometimes "$MSG_USER_BATCH" false "$details"; fi
+      grep -m 1 -e 'unrecoverably invalid' -e 'Not enough correct responses' -e 'Too many faulty' \
+        -e 'Not enough shares to reconstruct' -e 'Error reconstructing all blocks' cli.out |
+        sed 's/^/suspicious user decryption error: /' | cut -c 1-400
+      tail -n 5 cli.out | cut -c 1-400
+      [ "$attempt" -lt "$max_attempts" ] && sleep 10
+    done
+
+    echo "user decryption: ok=$ok after $attempt attempt(s), $failed without a verdict"
     exit 0

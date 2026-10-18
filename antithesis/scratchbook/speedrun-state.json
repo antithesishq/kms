@@ -1,0 +1,1100 @@
+{
+ "schema": 1,
+ "skill_version": "v0.7",
+ "invocation_dir": "/home/exedev/kms",
+ "workspace": "/home/exedev/kms",
+ "variant": "baseline",
+ "customer": {
+  "name": "Zama",
+  "slug": "zama-kms",
+  "website": "https://www.zama.ai"
+ },
+ "inputs": {
+  "product_url": "https://github.com/zama-ai/kms",
+  "repo": "/home/exedev/kms",
+  "notes": [
+   "harness pre-exists in antithesis/ (k8s, basic_k8s_test); coverage instrumentation pre-wired"
+  ],
+  "adopted_artifacts": []
+ },
+ "engine": "docker",
+ "skill_dir": "/home/exedev/.claude/skills/antithesis-speedrun",
+ "snouty_settings": null,
+ "tenant": "zama",
+ "workload_language": "",
+ "triage_skill": "antithesis-triage",
+ "capabilities": {
+  "follow": false,
+  "exec": true,
+  "cancel": true,
+  "tenant_release": "unknown",
+  "follow_note": "runs search --follow timed out on in-progress runs (SB/logs/live-iterate-1.err); exec refused completed runs"
+ },
+ "launchers": {
+  "name": "advanced_k8s_test",
+  "fallback": "basic_k8s_test",
+  "performance_tier_available": null,
+  "roles": {
+   "sut": [
+    "^kms-core-[1-4]-core-[1-4]$"
+   ],
+   "workload": [
+    "^kms-core-client"
+   ],
+   "dependency": [
+    "^minio-"
+   ],
+   "monitor": []
+  },
+  "flag": "--webhook",
+  "source": "speedrun",
+  "image_tag_prefix": "speedrun-",
+  "fault_levels": {
+   "1-network": [
+    "custom.enabled_faults=network"
+   ],
+   "2-network+kill": [
+    "custom.enabled_faults=network,pod_kill",
+    "custom.pod_fault_interval_seconds=600"
+   ],
+   "3-default": [
+    "custom.enabled_faults=network,pod_stop,pod_kill,clock_jitter"
+   ],
+   "4-strobe": [
+    "custom.enabled_faults=network,pod_stop,pod_kill,clock_jitter",
+    "custom.strobe_quiet_max_seconds=120",
+    "custom.strobe_quiet_min_seconds=60"
+   ],
+   "experiments": [
+    "custom.timing_fuzzing=true",
+    "cpu_pressure"
+   ]
+  },
+  "min_duration_minutes": 15,
+  "exclusions": {
+   "custom.container_faults_stop_exclusion_patterns": "^kms-core-client,^minio-",
+   "custom.container_faults_kill_exclusion_patterns": "^kms-core-client,^minio-"
+  }
+ },
+ "machine": {
+  "cpus": 16,
+  "mem_gb": 31,
+  "disk_free_gb": 135,
+  "vm_name": "ashvin-zama-kms"
+ },
+ "fault_needs": [],
+ "recurring_warnings": [
+  {
+   "property": "No unexpected container exits (kms-core exit 1; kms-core-init-gen-keys exit 1)",
+   "runs": [
+    "8bce7ea4",
+    "5a41ff45",
+    "63908ef2",
+    "8196fb3c",
+    "52a8bf9b",
+    "bbb951cd",
+    "336b5b11",
+    "4e338bff",
+    "6111d172",
+    "f138c07c",
+    "9f7fa3b1",
+    "b4fb2ef1"
+   ],
+   "counts": null,
+   "told_user_at": "2026-10-18T00:04:42Z",
+   "investigation": "cores booting while partitioned from MinIO exit 1 (FheKeyInfo read fails) and are restarted by Kubernetes; gen-keys init container likewise",
+   "counts_note": "hunts (kms-core exit 1 / gen-keys exit 1): 8196fb3c 1268/96, 52a8bf9b 1841/124, bbb951cd 1335/205, 336b5b11 288/39; iterate runs: see runs/iterate-*.md; 4e338bff 2275/209 (+ kms-core-init-load-env exit 1: 16), 6111d172 1451/121; f138c07c 757/65; 9f7fa3b1 1478/77; b4fb2ef1 911/58"
+  },
+  {
+   "property": "Peak memory usage",
+   "runs": [
+    "8196fb3c",
+    "52a8bf9b",
+    "bbb951cd",
+    "336b5b11",
+    "a7167532",
+    "f138c07c",
+    "b4fb2ef1"
+   ],
+   "counts": [
+    1235,
+    1650,
+    615,
+    1370,
+    12,
+    1,
+    331
+   ],
+   "told_user_at": "2026-10-18T06:01:23Z",
+   "investigation": "memory climbs with the backlog of concurrent test commands (183-316 open) and reshares; VM 9.71 GiB; leak not ruled out; hunt-current-4 re-runs with 16 GiB; hunt-current-4 (16 GiB, 105 m) PASSES Peak memory usage -> memory headroom for the command backlog, no sign of a leak climbing to 95% of 16 GiB",
+   "classification": "false-positive (VM size), confirmed by hunt-current-4"
+  },
+  {
+   "property": "No unexpected container exits (kms-core exit 101: bind 0.0.0.0:50100 AddrInUse)",
+   "runs": [
+    "5a41ff45",
+    "bbb951cd",
+    "4e338bff",
+    "f138c07c",
+    "9f7fa3b1"
+   ],
+   "counts": [
+    3,
+    150,
+    155,
+    115,
+    8
+   ],
+   "told_user_at": "2026-10-18T06:01:23Z",
+   "investigation": "port held 34-43 s across restarts in one pod; local check: TIME-WAIT of an outgoing connection on 50100 blocks the bind (EADDRINUSE); unconfirmed in the run; recurs in hunt-current-3 (155); absent in hunt-current-4"
+  }
+ ],
+ "budget": {
+  "minutes": {
+   "setup": 5,
+   "iterate": 30,
+   "hunt_default": 240,
+   "hunt_min": 60,
+   "fixverify": 120
+  },
+  "poll_interval_min": 10,
+  "max_concurrent": {
+   "iteration": 2,
+   "hunt": 4
+  },
+  "started_at": "2026-10-17T15:53:43Z",
+  "result_timeout_margin": {
+   "min_minutes": 30,
+   "fraction": 0.2
+  },
+  "deadline": "2026-10-18T08:00:00-04:00",
+  "deadline_tz": "America/New_York",
+  "deadline_source": "confirmed",
+  "cutoff": "2026-10-18T07:00:00-04:00",
+  "run_hours": {
+   "max": 40,
+   "used": 31.17,
+   "note": "sum of --duration of every launched run (corrected 2026-10-18T07:05Z: the four 240 m hunts had been counted twice)"
+  }
+ },
+ "phases": {
+  "P0": {
+   "status": "done",
+   "attempts": 1,
+   "max_attempts": 1,
+   "artifact": "antithesis/scratchbook/inputs.md",
+   "evidence": [
+    "snouty 0.8.0 (3085b38); launch --help lists --launcher; runs exec --container present; runs cancel present",
+    "snouty doctor with ANTITHESIS_* env unset: ok=true, api_key ok, api ok, tenant zama, repository us-central1-docker.pkg.dev/molten-verve-216720/zama-repository (SB/logs/doctor-p0.json)",
+    "snouty doctor with env vars: api 403 (exe.dev team integration not attached to this VM)",
+    "engine podman 4.9.3 responds; podman login --get-login us-central1-docker.pkg.dev = _json_key",
+    "git, jq, gh present (gh not logged in); kubectl, kapp, k3s present",
+    "skills: antithesis-setup, antithesis-setup-k8s, antithesis-workload, antithesis-research, antithesis-triage (API-only) present; antithesis-customer-research MISSING (P1 done by a general sub-agent instead)",
+    "machine: 2 vCPU, 7 GB RAM, 25 GB disk with 17 GB free; Zama CI builds images on 64-CPU runners with 200 GB volumes; docs ask 24 GB RAM to run KMS nodes",
+    "registry has only uninstrumented images (nojitter-20261014-1056, nojitter-20261016-1730, local); no local images",
+    "resume 2026-10-17T16:13:55Z: machine now 16 vCPU / 31 GB / 135 GB free; doctor ok (tenant zama); podman login ok",
+    "podman build fails: runc 1.3.4 rejects buildah cache bind mounts with option z (SB/logs/build-current-3095d82a-podman-failed.txt); switched to docker 29.1.3 (docker driver, logged in to us-central1-docker.pkg.dev); snouty wrapper sets SNOUTY_CONTAINER_ENGINE=docker",
+    "podman build fails: runc 1.3.4 rejects buildah cache bind mounts with option z (SB/logs/build-current-3095d82a-podman-failed.txt); switched to docker 29.1.3 (docker driver, logged in to us-central1-docker.pkg.dev); snouty wrapper sets SNOUTY_CONTAINER_ENGINE=docker"
+   ],
+   "started_at": "2026-10-17T15:53:43Z",
+   "finished_at": "2026-10-17T16:08:38Z",
+   "note": "preflight passed except machine size; S12 judged at P0 because the SUT is fixed (this repo)"
+  },
+  "P1": {
+   "status": "done",
+   "attempts": 1,
+   "max_attempts": 1,
+   "max_minutes": 10,
+   "artifact": "antithesis/scratchbook/system-brief.md",
+   "evidence": [
+    "SB/system-brief.md written by general sub-agent (7 web lookup batches); 16 promises rows (14 explicit), 10 fixed MPC bugs from git log; production n=13 t=4, harness n=4 t=1"
+   ],
+   "started_at": "2026-10-17T16:15:01Z",
+   "finished_at": "2026-10-17T16:59:32Z",
+   "note": ""
+  },
+  "P2": {
+   "status": "done",
+   "attempts": 1,
+   "max_attempts": 2,
+   "max_minutes": 20,
+   "artifact": "antithesis/scratchbook/guarantees.md",
+   "evidence": [
+    "SB/guarantees.md: 5 guarantees, all sourced (URL+quote), 1 liveness (recovers-after-faults, window 300 s inferred from deployed network_timeout), 0 inferred rows; links ok"
+   ],
+   "started_at": "2026-10-17T17:03:16Z",
+   "finished_at": "2026-10-17T17:03:16Z",
+   "note": ""
+  },
+  "P3": {
+   "status": "done",
+   "attempts": 1,
+   "max_attempts": 1,
+   "max_minutes": 30,
+   "artifact": "antithesis/scratchbook/sut-choice.md",
+   "evidence": [
+    "SB/sut-choice.md: Zama KMS rank 0 (customer own OSS, BSD-3-Clause-Clear); current 4a644c85 (main, 2026-10-07, no release tags)",
+    "SB/positive-control.md: lead a51d30be (#887) breaks Guarantee 2, way = revert production hunks on current; 6 candidates evaluated",
+    "disk estimate 45-60 GB for planned builds vs 135 GB free: no S12",
+    "CLI cannot set request IDs: Guarantee 5 needs a small Rust helper"
+   ],
+   "started_at": "2026-10-17T17:03:16Z",
+   "finished_at": "2026-10-17T17:39:07Z",
+   "note": ""
+  },
+  "P4": {
+   "status": "done",
+   "attempts": 1,
+   "max_attempts": 1,
+   "max_minutes": 30,
+   "artifact": "antithesis/scratchbook/property-catalog.md",
+   "evidence": [
+    "catalog 5 entries 1:1 with guarantees.md; evidence files for all 5 with Known closed issues heading; tuning.md proposals; topology roles + pod regexes; links ok in 12 files",
+    "CLI connects to every configured core first (exits 1 while any core is down); CLI cannot set request IDs",
+    "recovery window: 300 s measured from all cores reachable, bounded 600 s after faults stop (CrashLoopBackOff cap)"
+   ],
+   "started_at": "2026-10-17T17:04:52Z",
+   "finished_at": "2026-10-17T19:16:38Z",
+   "note": ""
+  },
+  "P5": {
+   "status": "done",
+   "attempts": 1,
+   "max_attempts": 2,
+   "max_minutes": 60,
+   "validate_cycles": 1,
+   "max_validate_cycles": 6,
+   "artifact": "antithesis/config/manifests (rendered to antithesis/build/config)",
+   "evidence": [
+    "pre-existing k8s harness adopted; snouty validate antithesis/build/config exit 0 with TAG=speedrun-3095d82a (SB/logs/validate-current.txt), 880/884 policy checks passed, 4 readinessProbe warnings on Jobs and the client",
+    "setup-2 89e114d4 completed: all 41 properties passing incl. Software was instrumented, Every instrumented module has symbols, Thread pausing enabled; workload Always/Reachable hit (SB/runs/setup-2.md)"
+   ],
+   "started_at": "2026-10-17T17:06:39Z",
+   "finished_at": "2026-10-17T21:32:18Z",
+   "note": ""
+  },
+  "P6": {
+   "status": "done",
+   "attempts": 1,
+   "max_attempts": 12,
+   "max_minutes": 270,
+   "validate_cycles": 0,
+   "artifact": "antithesis/test/v1",
+   "evidence": [
+    "G1+G2 by sub-agent: parallel_driver_public_decrypt.sh (3/4-core configs, retries, failover), eventually_recovers_after_faults.sh (2 Always, 2 Sometimes; faults stop in eventually phase + ANTITHESIS_STOP_FAULTS 1020); init-container peer-cert retry in 31-34; validate ok (SB/logs/validate-workload-g12.txt); local k3s test ok (SB/logs/local-test-g12.txt); assertion-map.json 19 messages",
+    "G3+G4 by sub-agent: anytime_reshare_key.sh public-key digest before/after + source-epoch decrypt; parallel_driver_user_decrypt.sh (new); AlwaysOrUnreachable for reshared-epoch decrypts; assertion-map.json 33 messages; validate ok (SB/logs/validate-workload-g34.txt); local k3s ok",
+    "Guarantee 5 deferred (state guarantees[].deferred_reason)"
+   ],
+   "started_at": "2026-10-17T19:54:57Z",
+   "finished_at": "2026-10-17T22:43:30Z",
+   "note": "per_property: {slug: {attempts, max_attempts: 2, validate_cycles}}; max_validate_cycles is per attempt",
+   "max_validate_cycles": 2,
+   "per_property": {
+    "public-decrypt-returns-encrypted-plaintext": {
+     "attempts": 1,
+     "max_attempts": 2,
+     "status": "done"
+    },
+    "recovers-after-faults": {
+     "attempts": 1,
+     "max_attempts": 2,
+     "status": "done"
+    },
+    "reshare-preserves-key": {
+     "attempts": 1,
+     "max_attempts": 2,
+     "status": "done"
+    },
+    "user-decrypt-returns-encrypted-plaintext": {
+     "attempts": 1,
+     "max_attempts": 2,
+     "status": "done"
+    }
+   }
+  },
+  "P6b": {
+   "status": "done",
+   "attempts": 1,
+   "max_attempts": 4,
+   "max_minutes": 45,
+   "artifact": "antithesis/scratchbook/positive-control.md",
+   "evidence": [
+    "pre-fix images speedrun-3095d82a-prefix887 built in 1 attempt (SB/logs/build-prefix-887.txt): current + revert of a51d30be production hunks; binary checks ok; keepalive symbols absent in pre-fix kms-server, present in current",
+    "pre-fix images pushed to registry (SB/logs/push-prefix-a1.txt)"
+   ],
+   "started_at": "2026-10-17T17:39:07Z",
+   "finished_at": "2026-10-17T19:53:23Z",
+   "note": "attempts = builds: 2 candidates x 2"
+  },
+  "P7": {
+   "status": "done",
+   "attempts": 1,
+   "max_attempts": 2,
+   "max_minutes": 20,
+   "artifact": "antithesis/config-prefix/manifests",
+   "evidence": [
+    "antithesis/config-prefix rendered with speedrun-3095d82a-prefix887; validate ok (SB/logs/validate-prefix.txt); same-workload check all PASS (SB/logs/same-workload.txt): only KMS image tags differ, ConfigMap identical c1ee4019f9ae, core-service layers differ"
+   ],
+   "started_at": "2026-10-17T22:43:30Z",
+   "finished_at": "2026-10-17T22:43:30Z",
+   "note": "1 + 1 patch-port attempt"
+  },
+  "P8": {
+   "status": "done",
+   "attempts": 0,
+   "artifact": "antithesis/scratchbook/runs",
+   "evidence": [
+    "iterate-1 d886f1ac: all Always reached and passing at network-only faults; 2 pod-fault Sometimes unhit (SB/runs/iterate-1.md) -> green (network)",
+    "iterate-4 63908ef2 (default fault set): all guarantee assertions pass -> green (full)"
+   ],
+   "started_at": "2026-10-17T21:36:22Z",
+   "finished_at": "2026-10-18T00:26:33Z",
+   "note": "bounded by anti-spin rules, the clock and the ceiling",
+   "fix_invocations": 0,
+   "max_fix_invocations": 8
+  },
+  "P9": {
+   "status": "done",
+   "attempts": 0,
+   "artifact": "antithesis/scratchbook/runs",
+   "evidence": [
+    "SB/runs/hunt-current-1.md",
+    "SB/runs/hunt-current-2.md",
+    "SB/runs/hunt-current-3.md",
+    "SB/runs/hunt-current-4.md",
+    "SB/runs/hunt-current-5.md",
+    "SB/runs/hunt-current-6.md",
+    "SB/runs/hunt-current-7.md",
+    "SB/runs/hunt-prefix-1.md",
+    "SB/runs/hunt-prefix-2.md"
+   ],
+   "started_at": "2026-10-18T00:30:30Z",
+   "finished_at": "2026-10-18T10:42:26Z",
+   "note": "rolling until the cutoff; bounded by the clock and the ceiling"
+  },
+  "P10": {
+   "status": "done",
+   "attempts": 0,
+   "max_attempts": 3,
+   "max_minutes": 180,
+   "artifact": "antithesis/scratchbook/rca",
+   "evidence": [],
+   "started_at": "2026-10-18T05:50:36Z",
+   "finished_at": "2026-10-18T10:05:00Z",
+   "note": "1 per violation, <=3 | 2026-10-18T09:15Z blinded RCA started for storage-error-enters-recovery-mode (new violation on current, adversarial stands)"
+  },
+  "P11": {
+   "status": "done",
+   "attempts": 0,
+   "artifact": "speedrun-report.md, speedrun-briefing.md",
+   "evidence": [
+    "zama-kms/speedrun-report.md",
+    "zama-kms/speedrun-briefing.md",
+    "zama-kms/speedrun-tests.md",
+    "check_links ok (26 files)",
+    "document review 2 passes"
+   ],
+   "started_at": "2026-10-18T06:30:00Z",
+   "finished_at": "2026-10-18T11:10:00Z",
+   "note": "drafts written; document review pass 1 done (28 items) and fixed 07:06Z; final pass after the last results | 2026-10-18T10:52Z final documents written; links ok (17 files); document review (fresh reviewer, full pass on final docs: the pass-1 reviewer is unreachable after context compaction and the docs changed substantially) started"
+  }
+ },
+ "guarantees": [
+  {
+   "id": "guarantee-1",
+   "slug": "public-decrypt-returns-encrypted-plaintext",
+   "rank": 1,
+   "type": "Safety",
+   "workload": "implemented",
+   "control": false,
+   "catalog_status": ""
+  },
+  {
+   "id": "guarantee-2",
+   "slug": "recovers-after-faults",
+   "rank": 2,
+   "type": "Liveness",
+   "workload": "implemented",
+   "control": true,
+   "catalog_status": ""
+  },
+  {
+   "id": "guarantee-3",
+   "slug": "reshare-preserves-key",
+   "rank": 3,
+   "type": "Safety",
+   "workload": "implemented",
+   "control": false,
+   "catalog_status": ""
+  },
+  {
+   "id": "guarantee-4",
+   "slug": "user-decrypt-returns-encrypted-plaintext",
+   "rank": 4,
+   "type": "Safety",
+   "workload": "implemented",
+   "control": false,
+   "catalog_status": ""
+  },
+  {
+   "id": "guarantee-5",
+   "slug": "decrypt-request-id-retries",
+   "rank": 5,
+   "type": "Safety",
+   "workload": "deferred",
+   "control": false,
+   "catalog_status": "",
+   "deferred_reason": "kms-core-client cannot choose request IDs; a byte-identical resend needs a Rust helper built into the core-client image, i.e. new current and pre-fix image builds and ~5 GB of pushes, which the remaining time before the cutoff does not allow. Partial coverage: --sync resends the identical request on Unavailable/ResourceExhausted."
+  }
+ ],
+ "sut": {
+  "name": "Zama KMS",
+  "repo": "https://github.com/zama-ai/kms",
+  "rank_rule": "0: customer own open-source system",
+  "current_ref": "4a644c8546abc8b002b7e45c19bf195996e7d229",
+  "current_tag": "speedrun-3095d82a",
+  "prefix_ref": "612207a9567702dd7251eaac3c812d250220880f",
+  "fix_ref": "a51d30beeae0131a84c9875f62de3012ae3890f9",
+  "control_issue": "https://github.com/zama-ai/kms/pull/887",
+  "workload_image": "configmap@3cce831073f5",
+  "system_label": "kms",
+  "harness_ref": "3095d82afc277661a2d1629f8d31cc91bf4761f0",
+  "prefix_build": "current 3095d82a + antithesis/patches/prefix/0001-revert-887-http2-keepalive.patch (production hunks of a51d30be reversed)",
+  "prefix_tag": "speedrun-3095d82a-prefix887"
+ },
+ "runs": [
+  {
+   "purpose": "setup",
+   "variant": "current",
+   "n": 1,
+   "run_id": "0f9fd70df6238be30879ff456a2c276f-64-4",
+   "ref": "3095d82a",
+   "workload_image": "configmap 41-kms-workload-tests (public_decrypt, pre-speedrun)",
+   "minutes": 15,
+   "launcher": "advanced_k8s_test",
+   "fault_params": [
+    "custom.enabled_faults=network",
+    "custom.container_faults_stop_exclusion_patterns=^kms-core-client,^minio-",
+    "custom.container_faults_kill_exclusion_patterns=^kms-core-client,^minio-"
+   ],
+   "performance_tier": "standard",
+   "launched_at": "2026-10-17T19:51:51Z",
+   "status": "incomplete",
+   "purpose_note": "first run of the instrumented speedrun-3095d82a images with the existing public_decrypt workload; fault level 1 (network only)",
+   "triage_skill": "antithesis-triage",
+   "source": "speedrun",
+   "reported_at": "2026-10-17T20:06:14Z",
+   "triage": "SB/runs/setup-1.md",
+   "note": "harness: KMS images were never pushed (snouty pushed only the config image for k8s); Antithesis could not resolve kms/core-client:speedrun-3095d82a (error 4001)"
+  },
+  {
+   "purpose": "setup",
+   "variant": "current",
+   "n": 2,
+   "run_id": "89e114d426394d664701ec1ff03aa612-64-4",
+   "ref": "3095d82a",
+   "workload_image": "configmap 41-kms-workload-tests from git HEAD (public_decrypt, pre-speedrun)",
+   "minutes": 15,
+   "launcher": "advanced_k8s_test",
+   "fault_params": [
+    "custom.enabled_faults=network",
+    "custom.container_faults_stop_exclusion_patterns=^kms-core-client,^minio-",
+    "custom.container_faults_kill_exclusion_patterns=^kms-core-client,^minio-"
+   ],
+   "performance_tier": "standard",
+   "launched_at": "2026-10-17T21:01:28Z",
+   "status": "completed",
+   "purpose_note": "setup #1 again with the KMS images pushed first; network faults only",
+   "triage_skill": "antithesis-triage",
+   "source": "speedrun",
+   "reported_at": "2026-10-17T21:32:18Z",
+   "report_url": "https://zama.antithesis.com/report/ilG2W2eWtahE0MgFCM13ilUk/nBs_rWnrBYj49XFAHGNeCJoa2oeSD6hZxnAfR42DeIE.html?auth=v2.public.eyJuYmYiOiIyMDI2LTEwLTE3VDIwOjI4OjA3LjA2MDYyNjI2M1oiLCJzY29wZSI6eyJSZXBvcnRTY29wZVYxIjp7ImFzc2V0IjoibkJzX3JXbnJCWWo0OVhGQUhHTmVDSm9hMm9lU0Q2aFp4bkFmUjQyRGVJRS5odG1sIiwicmVwb3J0X2lkIjoiaWxHMlcyZVd0YWhFME1nRkNNMTNpbFVrIn19fds1Wp-y5Jgw079ePKBsYsHQIOAWfzdmjCCnJzav3zeVdEZvRnq1RrY4e_Ea8-TXpWHSH0RtQmXY0drVL_o5lQg",
+   "session_id": "9a4a81e9b466ae4b14dfab902bbe07ce-64-4",
+   "triage": "SB/runs/setup-2.md",
+   "fp_review": "no failures"
+  },
+  {
+   "purpose": "iterate",
+   "variant": "current",
+   "n": 1,
+   "run_id": "d886f1acb77fb11fd55f78423fdda9bf-64-4",
+   "ref": "3095d82a",
+   "workload_image": "configmap@e3587b5624f9",
+   "minutes": 30,
+   "launcher": "advanced_k8s_test",
+   "fault_params": [
+    "custom.enabled_faults=network",
+    "custom.container_faults_stop_exclusion_patterns=^kms-core-client,^minio-",
+    "custom.container_faults_kill_exclusion_patterns=^kms-core-client,^minio-"
+   ],
+   "performance_tier": "standard",
+   "launched_at": "2026-10-17T21:36:22Z",
+   "status": "completed",
+   "purpose_note": "first run of the speedrun workload for Guarantees 1 and 2 (new driver, recovery check, init-container cert retry); network faults only",
+   "triage_skill": "antithesis-triage",
+   "source": "speedrun",
+   "reported_at": "2026-10-17T22:25:12Z",
+   "report_url": "https://zama.antithesis.com/report/i9QvVQsNUV3lWeROzE30qG3G/YGlP1gzJvu1YGvvnc5gFTZMAddJga9xKGZuRd7-K0hw.html?auth=v2.public.eyJuYmYiOiIyMDI2LTEwLTE3VDIxOjE3OjE4LjI3MzMxNjI2MloiLCJzY29wZSI6eyJSZXBvcnRTY29wZVYxIjp7ImFzc2V0IjoiWUdsUDFnekp2dTFZR3Z2bmM1Z0ZUWk1BZGRKZ2E5eEtHWnVSZDctSzBody5odG1sIiwicmVwb3J0X2lkIjoiaTlRdlZRc05VVjNsV2VST3pFMzBxRzNHIn19fepgRllfmZncOVYFOd51epaITiFiUjGu3PlmgPn9wWx1mLwq-qLcGnKECPOyVSDkASL6IBKxeaNgUpgFDAdSLA0",
+   "session_id": "a8ea1d054332c685f73e85f6330a7d37-64-4",
+   "triage": "SB/runs/iterate-1.md",
+   "fp_review": "2 Sometimes unhit: harness-gap (need pod faults); no Always failures"
+  },
+  {
+   "purpose": "iterate",
+   "variant": "current",
+   "n": 2,
+   "run_id": "8bce7ea4f0dbbe8fd99570d14eca17e8-64-4",
+   "ref": "3095d82a",
+   "workload_image": "configmap@e3587b5624f9",
+   "minutes": 30,
+   "launcher": "advanced_k8s_test",
+   "fault_params": [
+    "custom.enabled_faults=network,pod_kill",
+    "custom.pod_fault_interval_seconds=600",
+    "custom.container_faults_stop_exclusion_patterns=^kms-core-client,^minio-",
+    "custom.container_faults_kill_exclusion_patterns=^kms-core-client,^minio-"
+   ],
+   "performance_tier": "standard",
+   "launched_at": "2026-10-17T22:27:39Z",
+   "status": "completed",
+   "purpose_note": "first run with pod kills (fault level 2), same workload as iterate-1",
+   "triage_skill": "antithesis-triage",
+   "source": "speedrun",
+   "reported_at": "2026-10-17T23:17:17Z",
+   "report_url": "https://zama.antithesis.com/report/44bMN2ghOV9ZTAc83HSRfKnO/96r6fNvaA5d6LUw5ajYS_fztx_3SlavhPmibaUEBBjQ.html?auth=v2.public.eyJzY29wZSI6eyJSZXBvcnRTY29wZVYxIjp7ImFzc2V0IjoiOTZyNmZOdmFBNWQ2TFV3NWFqWVNfZnp0eF8zU2xhdmhQbWliYVVFQkJqUS5odG1sIiwicmVwb3J0X2lkIjoiNDRiTU4yZ2hPVjlaVEFjODNIU1JmS25PIn19LCJuYmYiOiIyMDI2LTEwLTE3VDIyOjExOjQ5Ljc3OTUzNTgyN1oifSgqXMK1usZRwMye-_c4lZtMhUnajeS9S-m1KD51UoAdMwpsw4RopSB7vyLGKcKKHn_ojzZUOKHK_JyEPi37cAw",
+   "session_id": "4b4c0aa92d06b6b8d2ef47af6054f30c-64-4",
+   "triage": "SB/runs/iterate-2.md",
+   "fp_review": "2 default container-exit failures: false-positive (fail-fast boot on storage errors, SB/false-positives.md); guarantees all pass"
+  },
+  {
+   "purpose": "iterate",
+   "variant": "current",
+   "n": 3,
+   "run_id": "5a41ff4512a62b259c30d0cf245647d8-64-4",
+   "ref": "3095d82a",
+   "workload_image": "configmap@3cce831073f5",
+   "minutes": 30,
+   "launcher": "advanced_k8s_test",
+   "fault_params": [
+    "custom.enabled_faults=network,pod_kill",
+    "custom.pod_fault_interval_seconds=600",
+    "custom.container_faults_stop_exclusion_patterns=^kms-core-client,^minio-",
+    "custom.container_faults_kill_exclusion_patterns=^kms-core-client,^minio-"
+   ],
+   "performance_tier": "standard",
+   "launched_at": "2026-10-17T22:44:31Z",
+   "status": "completed",
+   "purpose_note": "first run of the full Guarantee 1-4 workload; fault level 2 like iterate-2 so the only change is the workload",
+   "triage_skill": "antithesis-triage",
+   "source": "speedrun",
+   "reported_at": "2026-10-17T23:40:26Z",
+   "report_url": "https://zama.antithesis.com/report/osAjr9BLYLHEbb3IXrirMKfU/qdH-RmNnyHthMKXV3T627ycFlSEFwwyqREKpQLF2ubI.html?auth=v2.public.eyJuYmYiOiIyMDI2LTEwLTE3VDIyOjI1OjU5LjI2NDI5NTMxN1oiLCJzY29wZSI6eyJSZXBvcnRTY29wZVYxIjp7ImFzc2V0IjoicWRILVJtTm55SHRoTUtYVjNUNjI3eWNGbFNFRnd3eXFSRUtwUUxGMnViSS5odG1sIiwicmVwb3J0X2lkIjoib3NBanI5QkxZTEhFYmIzSVhyaXJNS2ZVIn19fQfTp_Ex_1v8uV3QyajJ48Jw4HdyV1V3iprMM6sstjw5ZFUtGkmL2zv2RRGsRUfBLF_DjYhQu6Kd2hTVvfZU1wU",
+   "session_id": "8e53d2f5825b43a7aff6e3646ee7df0d-64-4",
+   "triage": "SB/runs/iterate-3.md",
+   "fp_review": "exit 1 / gen-keys exits: known false positives; exit 101 panic (AddrInUse on 50100 at boot): suspect, probing"
+  },
+  {
+   "purpose": "iterate",
+   "variant": "current",
+   "n": 4,
+   "run_id": "63908ef2a2ec82cae19c2426727cacca-64-4",
+   "ref": "3095d82a",
+   "workload_image": "configmap@3cce831073f5",
+   "minutes": 30,
+   "launcher": "advanced_k8s_test",
+   "fault_params": [
+    "custom.enabled_faults=network,pod_stop,pod_kill,clock_jitter",
+    "custom.container_faults_stop_exclusion_patterns=^kms-core-client,^minio-",
+    "custom.container_faults_kill_exclusion_patterns=^kms-core-client,^minio-"
+   ],
+   "performance_tier": "standard",
+   "launched_at": "2026-10-17T23:40:26Z",
+   "status": "completed",
+   "purpose_note": "first run with the full default fault set (level 3: adds pod_stop and clock_jitter, pod faults every ~300 s)",
+   "triage_skill": "antithesis-triage",
+   "source": "speedrun",
+   "reported_at": "2026-10-18T00:26:33Z",
+   "report_url": "https://zama.antithesis.com/report/DgQ4uIHChAmsytQJtPrXPQDb/yPjTJtmZAM_112M-SSCbQk4uO9AN3vqOJ1_evjj1u1A.html?auth=v2.public.eyJzY29wZSI6eyJSZXBvcnRTY29wZVYxIjp7ImFzc2V0IjoieVBqVEp0bVpBTV8xMTJNLVNTQ2JRazR1TzlBTjN2cU9KMV9ldmpqMXUxQS5odG1sIiwicmVwb3J0X2lkIjoiRGdRNHVJSENoQW1zeXRRSnRQclhQUURiIn19LCJuYmYiOiIyMDI2LTEwLTE3VDIzOjIwOjU1LjY0MTU1ODE4MFoifR1-46AAkqn4ZQ-dZa71vHM-dAwh9nGO_Tygp74fX6RNriNTp1uIFeFv9z8vEpT_ka5h0N_NjbSgVVNwI4KCSgc",
+   "session_id": "7df8eca0a9b50d49a273174566189816-64-4",
+   "triage": "SB/runs/iterate-4.md",
+   "fp_review": "no guarantee failures; known container-exit false positives; 2 G2 Sometimes unhit"
+  },
+  {
+   "purpose": "hunt",
+   "variant": "current",
+   "n": 1,
+   "run_id": "8196fb3cff90b7a677b4394f5e24e550-64-4",
+   "ref": "3095d82a",
+   "workload_image": "configmap@3cce831073f5",
+   "minutes": 240,
+   "launcher": "advanced_k8s_test",
+   "fault_params": [
+    "custom.enabled_faults=network,pod_stop,pod_kill,clock_jitter",
+    "custom.container_faults_stop_exclusion_patterns=^kms-core-client,^minio-",
+    "custom.container_faults_kill_exclusion_patterns=^kms-core-client,^minio-",
+    "antithesis.performance_tier=turbo"
+   ],
+   "performance_tier": "turbo",
+   "launched_at": "2026-10-18T00:30:30Z",
+   "status": "completed",
+   "purpose_note": "first hunt on current, default fault set, 4 h",
+   "triage_skill": "antithesis-triage",
+   "source": "speedrun",
+   "reported_at": "2026-10-18T04:52:53Z",
+   "report_url": "https://zama.antithesis.com/report/RQ8Cbp-xGNyv2LzRK7QJhdaS/Q4j24Mga4r9vKq6G1GGKGJhmWP0f7ZtlCtPmgF4J-dU.html?auth=v2.public.eyJzY29wZSI6eyJSZXBvcnRTY29wZVYxIjp7ImFzc2V0IjoiUTRqMjRNZ2E0cjl2S3E2RzFHR0tHSmhtV1AwZjdadGxDdFBtZ0Y0Si1kVS5odG1sIiwicmVwb3J0X2lkIjoiUlE4Q2JwLXhHTnl2Mkx6Uks3UUpoZGFTIn19LCJuYmYiOiIyMDI2LTEwLTE4VDAzOjUyOjUyLjkwNzU2NjUzOVoiffXOyyh90TorAK1eQ08RnDaqV3Hiuf4ZXbyxANa4Qh-8Ku_qk3g7JPpHFH0alZBWKDgpmQ1bzWKzpgv7_81JSwI",
+   "session_id": "28d5e5b66639d2409d7f036de952378e-64-4",
+   "triage": "SB/runs/hunt-current-1.md",
+   "fp_review": "every guarantee property passes; container exit 1 (core, gen-keys): known false positives; Peak memory usage: suspect (false-positives.md#peak-memory-command-backlog)",
+   "control_failed": false
+  },
+  {
+   "purpose": "hunt",
+   "variant": "prefix",
+   "n": 1,
+   "run_id": "52a8bf9be7747728dac81893037062a5-64-4",
+   "ref": "3095d82a-prefix887",
+   "workload_image": "configmap@3cce831073f5",
+   "minutes": 240,
+   "launcher": "advanced_k8s_test",
+   "fault_params": [
+    "custom.enabled_faults=network,pod_stop,pod_kill,clock_jitter",
+    "custom.container_faults_stop_exclusion_patterns=^kms-core-client,^minio-",
+    "custom.container_faults_kill_exclusion_patterns=^kms-core-client,^minio-",
+    "antithesis.performance_tier=turbo"
+   ],
+   "performance_tier": "turbo",
+   "launched_at": "2026-10-18T00:30:30Z",
+   "status": "completed",
+   "purpose_note": "first pre-fix hunt (known-bug check), default fault set, 4 h",
+   "triage_skill": "antithesis-triage",
+   "source": "speedrun",
+   "reported_at": "2026-10-18T04:59:14Z",
+   "report_url": "https://zama.antithesis.com/report/9eEE7zOFd9Dh9U3xoux0L-pj/QKG_cHLnNVVbOYWB0R0HlqKpRTSdfPqStnNZHN3dfPw.html?auth=v2.public.eyJzY29wZSI6eyJSZXBvcnRTY29wZVYxIjp7ImFzc2V0IjoiUUtHX2NITG5OVlZiT1lXQjBSMEhscUtwUlRTZGZQcVN0bk5aSE4zZGZQdy5odG1sIiwicmVwb3J0X2lkIjoiOWVFRTd6T0ZkOURoOVUzeG91eDBMLXBqIn19LCJuYmYiOiIyMDI2LTEwLTE4VDAzOjU5OjE0LjIyMjgwNjM3N1oifbWHfRwyY5SragY9QudsFg23eqGDVqsOLpO1QjjEXtewl5lI-gUwUNxI3o5onfIw34kyP6XqcyIcKwhz_FiQ4Qk",
+   "session_id": "3684f1dfb7414641a5de8ad694e0cbf7-64-4",
+   "triage": "SB/runs/hunt-prefix-1.md",
+   "fp_review": "Guarantee 2 recovery Always: real, the known bug (false-positives.md#prefix-recovery-fails-after-core-restart); container exits: known false positives; Peak memory usage: under review",
+   "control_failed": true
+  },
+  {
+   "purpose": "hunt",
+   "variant": "current",
+   "n": 2,
+   "run_id": "bbb951cd05081326d83a92e7efdba98c-64-4",
+   "ref": "3095d82a",
+   "workload_image": "configmap@3cce831073f5",
+   "minutes": 240,
+   "launcher": "advanced_k8s_test",
+   "fault_params": [
+    "custom.enabled_faults=network,pod_stop,pod_kill,clock_jitter",
+    "custom.container_faults_stop_exclusion_patterns=^kms-core-client,^minio-",
+    "custom.container_faults_kill_exclusion_patterns=^kms-core-client,^minio-",
+    "antithesis.performance_tier=turbo",
+    "custom.strobe_quiet_max_seconds=120",
+    "custom.strobe_quiet_min_seconds=60"
+   ],
+   "performance_tier": "turbo",
+   "launched_at": "2026-10-18T00:30:30Z",
+   "status": "completed",
+   "purpose_note": "hunt on current with strobing (quiet windows), 4 h",
+   "triage_skill": "antithesis-triage",
+   "source": "speedrun",
+   "reported_at": "2026-10-18T04:56:04Z",
+   "report_url": "https://zama.antithesis.com/report/RrQpUXYBRSznhOom3OWSsVwm/GOczSuL6QWj7Sl9UX46ZavqUH-q6DwiQt8cf-yXoqwA.html?auth=v2.public.eyJuYmYiOiIyMDI2LTEwLTE4VDAzOjU2OjAzLjUzMjQyMjgxMVoiLCJzY29wZSI6eyJSZXBvcnRTY29wZVYxIjp7ImFzc2V0IjoiR09jelN1TDZRV2o3U2w5VVg0NlphdnFVSC1xNkR3aVF0OGNmLXlYb3F3QS5odG1sIiwicmVwb3J0X2lkIjoiUnJRcFVYWUJSU3puaE9vbTNPV1NzVndtIn19fV6KMVLXfgSv3BN0DgMakXVvvIoEAi2-twEk9HZOqycO8BOfEEsMjOAaYl8MgRQlvNNY0l4DDvldF3EVrgJg9A4",
+   "session_id": "d0254dba44ad247aeab414711b65127c-64-4",
+   "triage": "SB/runs/hunt-current-2.md",
+   "fp_review": "every guarantee property passes; container exit 1 (core, gen-keys): known false positives; Peak memory usage: suspect (false-positives.md#peak-memory-command-backlog); exit 101 bind panic: suspect, unconfirmed finding (false-positives.md#boot-panic-port-in-use)",
+   "control_failed": false
+  },
+  {
+   "purpose": "hunt",
+   "variant": "prefix",
+   "n": 2,
+   "run_id": "336b5b11e419dc9281d5298bbe3deff0-64-4",
+   "ref": "3095d82a-prefix887",
+   "workload_image": "configmap@3cce831073f5",
+   "minutes": 240,
+   "launcher": "advanced_k8s_test",
+   "fault_params": [
+    "custom.enabled_faults=network,pod_stop,pod_kill,clock_jitter",
+    "custom.container_faults_stop_exclusion_patterns=^kms-core-client,^minio-",
+    "custom.container_faults_kill_exclusion_patterns=^kms-core-client,^minio-",
+    "antithesis.performance_tier=turbo",
+    "custom.strobe_quiet_max_seconds=120",
+    "custom.strobe_quiet_min_seconds=60"
+   ],
+   "performance_tier": "turbo",
+   "launched_at": "2026-10-18T00:30:30Z",
+   "status": "completed",
+   "purpose_note": "pre-fix hunt with strobing (quiet windows), 4 h",
+   "triage_skill": "antithesis-triage",
+   "source": "speedrun",
+   "reported_at": "2026-10-18T05:01:42Z",
+   "report_url": "https://zama.antithesis.com/report/Fll8Soc5kCDFTeEZp3ek17Ea/gZZGf9Vks_xaKy0EyS88AGlaJVfemscOEEYb6WG4vAs.html?auth=v2.public.eyJuYmYiOiIyMDI2LTEwLTE4VDA0OjAxOjQxLjY1NTk3MDU5M1oiLCJzY29wZSI6eyJSZXBvcnRTY29wZVYxIjp7ImFzc2V0IjoiZ1paR2Y5VmtzX3hhS3kwRXlTODhBR2xhSlZmZW1zY09FRVliNldHNHZBcy5odG1sIiwicmVwb3J0X2lkIjoiRmxsOFNvYzVrQ0RGVGVFWnAzZWsxN0VhIn19fYJapcfSFfD2FlJP98J-1mav97zxLbJd1AWPqbw3R4BFyC9CJe4Ma707fn9SKpmxAwnwRwWBuICXoowHTbT69wM",
+   "session_id": "e5d0f4e5d836bf22bd6bfc4fe7063a27-64-4",
+   "triage": "SB/runs/hunt-prefix-2.md",
+   "fp_review": "Guarantee 2 recovery Always: real, the known bug (false-positives.md#prefix-recovery-fails-after-core-restart); container exits: known false positives; Peak memory usage: under review",
+   "control_failed": true
+  },
+  {
+   "purpose": "hunt",
+   "variant": "current",
+   "n": 3,
+   "run_id": "4e338bff64a6f329ebadc856cace0692-64-4",
+   "ref": "3095d82a",
+   "workload_image": "configmap@3cce831073f5",
+   "minutes": 105,
+   "launcher": "advanced_k8s_test",
+   "fault_params": [
+    "custom.enabled_faults=network,pod_stop,pod_kill,clock_jitter",
+    "custom.container_faults_stop_exclusion_patterns=^kms-core-client,^minio-",
+    "custom.container_faults_kill_exclusion_patterns=^kms-core-client,^minio-",
+    "antithesis.performance_tier=turbo",
+    "custom.timing_fuzzing=true"
+   ],
+   "performance_tier": "turbo",
+   "launched_at": "2026-10-18T06:00:00Z",
+   "status": "completed",
+   "purpose_note": "level 3 plus timing fuzzing (new timing regimes for races), 105 m",
+   "triage_skill": "antithesis-triage",
+   "source": "speedrun",
+   "reported_at": "2026-10-18T08:04:43Z",
+   "report_url": "https://zama.antithesis.com/report/z0DpS4BEFi0AtQY_3k2xQYil/WNeeUiIs3qYUlUd7UAiS1YdNQh8HKvhl2ofzq82Afa8.html?auth=v2.public.eyJuYmYiOiIyMDI2LTEwLTE4VDA3OjA0OjQzLjEwMjAyODEzMloiLCJzY29wZSI6eyJSZXBvcnRTY29wZVYxIjp7ImFzc2V0IjoiV05lZVVpSXMzcVlVbFVkN1VBaVMxWWROUWg4SEt2aGwyb2Z6cTgyQWZhOC5odG1sIiwicmVwb3J0X2lkIjoiejBEcFM0QkVGaTBBdFFZXzNrMnhRWWlsIn19fZI8ndKJGsf6_PbNOmcRvP7XRP6CnD-8mfcqZYL0UYS8iuH35ePerg9wy7HvBDKR8Y_jV7R5W-saZjsBZoGotAo",
+   "session_id": "88ceb1add6b037b42548b98e799583e4-64-4",
+   "triage": "SB/runs/hunt-current-3.md",
+   "fp_review": "Guarantee 2 Always: execution A (1 cx) real -> violations[] storage-error-enters-recovery-mode (adversarial: stands); execution B (47 cx) false-positive, environment stall (client stalled before contacting any core, VM quiet ~290 s) (false-positives.md#recovery-check-attempt-outlives-timeout); No Antithesis errors / coredns exit 2 / journald crash: suspect platform (#timing-fuzzing-guest-stalls); init-load-env exit 1: false-positive harness; known exits recur",
+   "control_failed": false
+  },
+  {
+   "purpose": "hunt",
+   "variant": "current",
+   "n": 4,
+   "run_id": "6111d172031d2759747024bdb638b01a-64-4",
+   "ref": "3095d82a",
+   "workload_image": "configmap@3cce831073f5",
+   "minutes": 105,
+   "launcher": "advanced_k8s_test",
+   "fault_params": [
+    "custom.enabled_faults=network,pod_stop,pod_kill,clock_jitter",
+    "custom.container_faults_stop_exclusion_patterns=^kms-core-client,^minio-",
+    "custom.container_faults_kill_exclusion_patterns=^kms-core-client,^minio-",
+    "antithesis.performance_tier=turbo",
+    "custom.vm_memory_mb=16384"
+   ],
+   "performance_tier": "turbo",
+   "launched_at": "2026-10-18T06:00:00Z",
+   "status": "completed",
+   "purpose_note": "level 3 with a 16 GiB test VM: tells a memory leak from the command backlog behind Peak memory usage, 105 m",
+   "triage_skill": "antithesis-triage",
+   "source": "speedrun",
+   "reported_at": "2026-10-18T08:08:52Z",
+   "report_url": "https://zama.antithesis.com/report/P1OrdTOwOQhvk1Bda_x3yATq/6G9cywvyWShFE6lQzOi0RmoaJzzoiArwrA7fpzOnKiU.html?auth=v2.public.eyJzY29wZSI6eyJSZXBvcnRTY29wZVYxIjp7ImFzc2V0IjoiNkc5Y3l3dnlXU2hGRTZsUXpPaTBSbW9hSnp6b2lBcndyQTdmcHpPbktpVS5odG1sIiwicmVwb3J0X2lkIjoiUDFPcmRUT3dPUWh2azFCZGFfeDN5QVRxIn19LCJuYmYiOiIyMDI2LTEwLTE4VDA3OjA4OjUyLjM1MjQ2MTQ4Mloifcvim4mQHGuO4yuywJaNWaRVq1skn9a4_E1eXUtmVC_gVSCCpxteSZeLsyy0z01YAT6E2l37bGY50_RmzPPTgwM",
+   "session_id": "aebc59a94f795d0b3948c17f521156f2-64-4",
+   "triage": "SB/runs/hunt-current-4.md",
+   "fp_review": "all guarantee properties pass; Peak memory usage passes at 16 GiB -> earlier failures reclassified false-positive (VM too small for the command backlog, false-positives.md#peak-memory-command-backlog); container exits: known false positives; exit 101 absent",
+   "control_failed": false
+  },
+  {
+   "purpose": "fix-verify",
+   "variant": "fixverify-decryption-stalls-after-core-restart",
+   "n": 1,
+   "run_id": "a7167532671d016c1683aa3df1145e45-64-4",
+   "ref": "3095d82a-fix-decryption-stalls",
+   "workload_image": "configmap@3cce831073f5",
+   "minutes": 120,
+   "launcher": "advanced_k8s_test",
+   "fault_params": [
+    "custom.enabled_faults=network,pod_stop,pod_kill,clock_jitter",
+    "custom.container_faults_stop_exclusion_patterns=^kms-core-client,^minio-",
+    "custom.container_faults_kill_exclusion_patterns=^kms-core-client,^minio-",
+    "antithesis.performance_tier=turbo"
+   ],
+   "performance_tier": "turbo",
+   "launched_at": "2026-10-18T06:53:30Z",
+   "status": "completed",
+   "purpose_note": "fix check of the blinded patch on the pre-fix build, same faults as hunt-prefix-1",
+   "triage_skill": "antithesis-triage",
+   "source": "speedrun",
+   "reported_at": "2026-10-18T09:09:19Z",
+   "report_url": "https://zama.antithesis.com/report/E3aRgfAZx0FG9ubZyK2gLIoR/WOfMjnEReqZRagmPUuWwUHPDAjmwjhtZw3u5U5iRSuU.html?auth=v2.public.eyJuYmYiOiIyMDI2LTEwLTE4VDA4OjA5OjE5LjE3MjY0NjYxM1oiLCJzY29wZSI6eyJSZXBvcnRTY29wZVYxIjp7ImFzc2V0IjoiV09mTWpuRVJlcVpSYWdtUFV1V3dVSFBEQWptd2podFp3M3U1VTVpUlN1VS5odG1sIiwicmVwb3J0X2lkIjoiRTNhUmdmQVp4MEZHOXViWnlLMmdMSW9SIn19feJnQdPR6ASOY1JTnB5-6WNI3-5xqJfWurzelFpKrcEWWRqdnjJ2gCtotLkMWQ5e1aqAmMFoC5nDcB466sYCTwU",
+   "session_id": "e102516a058c0d93a088a11f12a8de2d-64-4",
+   "triage": "SB/runs/fix-verify-1.md",
+   "fp_review": "all guarantee properties pass, all Sometimes hit; Peak memory usage (12 cx, default VM) and known container exits only",
+   "control_failed": false
+  },
+  {
+   "purpose": "hunt",
+   "variant": "current",
+   "n": 5,
+   "run_id": "f138c07c6969e0a9691b2a7192e8749c-64-4",
+   "ref": "3095d82a",
+   "workload_image": "configmap@3cce831073f5",
+   "minutes": 180,
+   "launcher": "advanced_k8s_test",
+   "fault_params": [
+    "custom.enabled_faults=network,pod_stop,pod_kill,clock_jitter",
+    "custom.container_faults_stop_exclusion_patterns=^kms-core-client,^minio-",
+    "custom.container_faults_kill_exclusion_patterns=^kms-core-client,^minio-",
+    "antithesis.performance_tier=turbo",
+    "custom.strobe_quiet_max_seconds=120",
+    "custom.strobe_quiet_min_seconds=60",
+    "custom.pod_fault_interval_seconds=150"
+   ],
+   "performance_tier": "turbo",
+   "launched_at": "2026-10-18T07:03:50Z",
+   "status": "completed",
+   "purpose_note": "level 3 with strobing and pod stops/kills twice as often: more restarts and mid-run recoveries, 180 m",
+   "triage_skill": "antithesis-triage",
+   "source": "speedrun",
+   "reported_at": "2026-10-18T10:20:12Z",
+   "report_url": "https://zama.antithesis.com/report/fGBWatltHprLF20S9ngnf_Xx/axTAE2jgHdQBkKrbRNM9KwkMvW5_QmpoTc8LDOpxSOY.html?auth=v2.public.eyJuYmYiOiIyMDI2LTEwLTE4VDA5OjIwOjExLjc0ODYwNzIxOFoiLCJzY29wZSI6eyJSZXBvcnRTY29wZVYxIjp7ImFzc2V0IjoiYXhUQUUyamdIZFFCa0tyYlJOTTlLd2tNdlc1X1FtcG9UYzhMRE9weFNPWS5odG1sIiwicmVwb3J0X2lkIjoiZkdCV2F0bHRIcHJMRjIwUzluZ25mX1h4In19fW3zT4lKIsk7YZnr70bN1tmOm4j8MTfQ6Vdl27XtDiq70F1RB_57_1SoZ7QUNY07jsf_7-ZuPmZontnlKcNVKQ4",
+   "session_id": "80a943125b1b760f9bfc7039d4d82a69-64-4",
+   "triage": "SB/runs/hunt-current-5.md",
+   "fp_review": "all guarantee properties pass, all markers hit; known failures only (Peak memory 1 cx at 9.71 GiB, exit 1, exit 101 x115, gen-keys); no recovery mode entry",
+   "control_failed": false
+  },
+  {
+   "purpose": "hunt",
+   "variant": "current",
+   "n": 6,
+   "run_id": "9f7fa3b1be496d51e9f1282f511a729c-64-4",
+   "ref": "3095d82a",
+   "workload_image": "configmap@3cce831073f5",
+   "minutes": 125,
+   "launcher": "advanced_k8s_test",
+   "fault_params": [
+    "custom.enabled_faults=network,pod_stop,pod_kill,clock_jitter",
+    "custom.container_faults_stop_exclusion_patterns=^kms-core-client,^minio-",
+    "custom.container_faults_kill_exclusion_patterns=^kms-core-client,^minio-",
+    "antithesis.performance_tier=turbo",
+    "custom.timing_fuzzing=true",
+    "custom.vm_memory_mb=16384"
+   ],
+   "performance_tier": "turbo",
+   "launched_at": "2026-10-18T08:11:57Z",
+   "status": "completed",
+   "purpose_note": "second timing-fuzzing run: does the Guarantee 2 failure from hunt current-3 reproduce, with memory pressure removed (16 GiB)",
+   "triage_skill": "antithesis-triage",
+   "source": "speedrun",
+   "reported_at": "2026-10-18T10:39:15Z",
+   "report_url": "https://zama.antithesis.com/report/o8xNfnvPNgTUfOskOctLnlkS/-F82X7-TJYyvoHCWd5I-9QkUhYMCmCi2ouiS5N_b-eM.html?auth=v2.public.eyJzY29wZSI6eyJSZXBvcnRTY29wZVYxIjp7ImFzc2V0IjoiLUY4Mlg3LVRKWXl2b0hDV2Q1SS05UWtVaFlNQ21DaTJvdWlTNU5fYi1lTS5odG1sIiwicmVwb3J0X2lkIjoibzh4TmZudlBOZ1RVZk9za09jdExubGtTIn19LCJuYmYiOiIyMDI2LTEwLTE4VDA5OjM5OjE0LjExNTgwODU2M1oifZQTX0mC0s_eteptEa4dnjKUBSq7S1eeAtwcWmKF67SGnjmZE3uBvhjqT5bzEYFf9J4j7rxMcCA2c-dR621ggQE",
+   "session_id": "dc90cec2d0f68894eadd62db01801063-64-4",
+   "triage": "SB/runs/hunt-current-6.md",
+   "fp_review": "all guarantee properties pass, all markers hit; known failures only; no recovery-mode entry (search on the finished run, 10:58Z); no guest-stall failures",
+   "control_failed": false
+  },
+  {
+   "purpose": "hunt",
+   "variant": "current",
+   "n": 7,
+   "run_id": "b4fb2ef150cdb9e48bb03559d094b203-64-4",
+   "ref": "3095d82a",
+   "workload_image": "configmap@3cce831073f5",
+   "minutes": 125,
+   "launcher": "advanced_k8s_test",
+   "fault_params": [
+    "custom.enabled_faults=network,pod_stop,pod_kill,clock_jitter",
+    "custom.container_faults_stop_exclusion_patterns=^kms-core-client,^minio-",
+    "custom.container_faults_kill_exclusion_patterns=^kms-core-client,^minio-",
+    "antithesis.performance_tier=turbo",
+    "custom.strobe_quiet_max_seconds=120",
+    "custom.strobe_quiet_min_seconds=60",
+    "custom.timing_fuzzing=true"
+   ],
+   "performance_tier": "turbo",
+   "launched_at": "2026-10-18T08:12:01Z",
+   "status": "completed",
+   "purpose_note": "timing fuzzing with strobing (level 4): more quiet windows, so recovery is checked more often under perturbed timing",
+   "triage_skill": "antithesis-triage",
+   "source": "speedrun",
+   "reported_at": "2026-10-18T10:37:32Z",
+   "report_url": "https://zama.antithesis.com/report/_r-7C_mLdeGjzdbEVsK15PuH/42JWZeknAsGm-Z_Vb0O9CfhoehGQ8EEfn0gC54lbVw4.html?auth=v2.public.eyJuYmYiOiIyMDI2LTEwLTE4VDA5OjM3OjMxLjc3MzcwMzg0MloiLCJzY29wZSI6eyJSZXBvcnRTY29wZVYxIjp7ImFzc2V0IjoiNDJKV1pla25Bc0dtLVpfVmIwTzlDZmhvZWhHUThFRWZuMGdDNTRsYlZ3NC5odG1sIiwicmVwb3J0X2lkIjoiX3ItN0NfbUxkZUdqemRiRVZzSzE1UHVIIn19fd7jJl7N6kidkKYdWS4iGgq7nHJea7bzEdw3s4okVCcvr3q6xrnYfPnZxMlXsbyGPWGtO3JfQ-rKPdebKXwKgQk",
+   "session_id": "b6ac3d60947c7e134a526ed9b8edfbcd-64-4",
+   "triage": "SB/runs/hunt-current-7.md",
+   "fp_review": "all guarantee properties pass, all markers hit; known failures only; no recovery-mode entry (search on the finished run, 10:58Z); no guest-stall failures",
+   "control_failed": false
+  }
+ ],
+ "control": {
+  "reproduced": true,
+  "run_id": "52a8bf9be7747728dac81893037062a5-64-4",
+  "first_failure_vtime": 537.25,
+  "kind": "historical",
+  "moot": false,
+  "prefix_hunts": 2,
+  "note": "known bug reproduced in both pre-fix hunts; current passes the same property in every run with the same faults (its one failure, under timing fuzzing in 4e338bff, is the separate finding storage-error-enters-recovery-mode); fix verified (a7167532)",
+  "name": "decryption-stalls-after-core-restart",
+  "rca": "SB/rca/decryption-stalls-after-core-restart.md",
+  "patch": "antithesis/fixes/decryption-stalls-after-core-restart.patch",
+  "blind_hash": {
+   "rca": "e265fdeef5551784e22401216e2524430125266de99a60c99923c19f6270b8de",
+   "patch": "a963dee479b70a730c56895e7fa5c38b2fec8739c922d688a3803723d969089f",
+   "at": "2026-10-18T06:17:55Z"
+  },
+  "fix_verify": {
+   "status": "verified",
+   "tag": "speedrun-3095d82a-fix-decryption-stalls",
+   "patch_set": "antithesis/patches/fixverify-decryption-stalls-after-core-restart",
+   "tree": "/home/exedev/kms-fixverify",
+   "run_id": "a7167532671d016c1683aa3df1145e45-64-4",
+   "digests": {
+    "core-service": "sha256:2b54e0b3515192908a43e3ab11fd2e0c1058c5f9bf416930530346e04675fc70",
+    "core-service-probe": "sha256:6aab4dd888f38fd3d78443b8263ab45f2fc8e6c6229bd9127d872bbe75008a7d",
+    "core-client": "sha256:ee84707ac41ffb56f70a8557dc532ec3b9482e73783e2e99224d8ceba8f8cd08",
+    "init-envsubst": "sha256:3dc0edb3c1eb2fa6153f42deb7eddcc6b53c05d77404693f6b3670f701474515"
+   },
+   "same_workload": "SB/logs/same-workload-fixverify.txt PASS",
+   "result": "Guarantee 2 Always pass (6934/0 each); Sometimes hit 87 and 116; run a7167532 120 m"
+  }
+ },
+ "green_at": "2026-10-17T22:25:12Z",
+ "green_full_at": "2026-10-18T00:26:33Z",
+ "violations": [
+  {
+   "name": "boot-panic-port-in-use",
+   "title": "A restarting core sometimes can't bind its service port",
+   "variant": "current",
+   "guarantee": null,
+   "property": "No unexpected container exits (kms-core, exit 101)",
+   "runs": [
+    "5a41ff4512a62b259c30d0cf245647d8-64-4",
+    "bbb951cd05081326d83a92e7efdba98c-64-4",
+    "4e338bff64a6f329ebadc856cace0692-64-4",
+    "f138c07c6969e0a9691b2a7192e8749c-64-4",
+    "9f7fa3b1be496d51e9f1282f511a729c-64-4"
+   ],
+   "counts": [
+    3,
+    150,
+    155,
+    115,
+    8
+   ],
+   "classification": "suspect",
+   "adversarial": "not run: classified suspect (never real), reported as unconfirmed; probe file instead",
+   "evidence": [
+    "SB/false-positives.md#boot-panic-port-in-use",
+    "SB/probes/boot-panic-port-in-use.md",
+    "SB/probes/boot-panic-port-in-use/tw-bind-check.md"
+   ],
+   "note": "Antithesis default property, not a guarantee; holder of port 50100 unproven; reported as unconfirmed",
+   "id": "boot-panic-port-in-use"
+  },
+  {
+   "id": "storage-error-enters-recovery-mode",
+   "name": "storage-error-enters-recovery-mode",
+   "title": "A storage error while a core boots leaves it in recovery mode, refusing every decryption",
+   "guarantee": "guarantee-2",
+   "variant": "current",
+   "run_id": "4e338bff64a6f329ebadc856cace0692-64-4",
+   "runs": [
+    "4e338bff64a6f329ebadc856cace0692-64-4"
+   ],
+   "also_seen": "8196fb3cff90b7a677b4394f5e24e550-64-4: kms-core-1 entered recovery mode (dispatch failure) and finished booting in it in 5 timelines (914.7-917.1); no request reached it there",
+   "counts": [
+    1
+   ],
+   "classification": "real",
+   "evidence": [
+    "SB/violations/storage-error-enters-recovery-mode.md",
+    "SB/false-positives.md#storage-error-enters-recovery-mode"
+   ],
+   "rca": "SB/rca/storage-error-enters-recovery-mode.md",
+   "patch": "antithesis/fixes/storage-error-enters-recovery-mode.patch",
+   "blind_hash": {
+    "rca": "94039e9d017e8386ecc52349d39e1450b9507aab1337955d01c648fe83bc1e9b",
+    "patch": "f658051fbf38edec5a43e4fb27967716735eb3690dc036c303c48ac913655cc5",
+    "at": "2026-10-18T09:20Z",
+    "file": "SB/logs/blind-hash-storage-error-enters-recovery-mode.txt"
+   },
+   "upstream_verdict": "new: not found in upstream issues/PRs; unchanged on main f0258b8a (reading check)",
+   "fix_verify": "not run in Antithesis (clock); unit test: new test fails without fix, passes with it; 50/50 backup_operator+recovery tests and 23/23 custodian_backup_tests pass with fix (SB/logs/unit-test-storage-error-enters-recovery-mode.txt)",
+   "found_live": false,
+   "probes": "",
+   "adversarial": "stands",
+   "adversarial_file": "SB/adversarial/storage-error-enters-recovery-mode.md",
+   "severity": "availability: stuck (a core never rejoins until restarted)",
+   "reproduction": "not reproduced in hunts 5-7 (searches 10:58Z); entries into recovery mode: 4e338bff (exercised), 8196fb3c (unexercised)"
+  }
+ ],
+ "stop": {
+  "code": null,
+  "phase": null,
+  "reason": null,
+  "at": null
+ },
+ "_shapes": {
+  "guarantee": {
+   "id": "guarantee-1",
+   "slug": "",
+   "rank": 1,
+   "workload": "pending",
+   "control": false,
+   "catalog_status": ""
+  },
+  "run": {
+   "purpose": "setup",
+   "variant": "current",
+   "_variant_values": "current | prefix | mutant | fixverify-<finding name>",
+   "n": 1,
+   "run_id": "",
+   "ref": "",
+   "workload_image": "",
+   "workload_image_layers": "",
+   "minutes": 5,
+   "launcher": "",
+   "fault_params": [],
+   "performance_tier": "",
+   "launched_at": "",
+   "last_polled_at": "",
+   "status": "",
+   "triage": "",
+   "triage_skill": "",
+   "fp_review": "",
+   "control_failed": null,
+   "note": "",
+   "live_checks": [],
+   "purpose_note": "",
+   "report_url": "",
+   "reported_at": "",
+   "session_id": "",
+   "live_stream": "",
+   "cancelled_at": "",
+   "cancel_reason": ""
+  },
+  "violation": {
+   "id": "<finding name: 2-5 lowercase words joined by hyphens, fixed once written (naming.md)>",
+   "title": "<plain sentence fragment saying what goes wrong; may be refined later>",
+   "guarantee": "guarantee-<n>",
+   "variant": "current",
+   "run_id": "",
+   "rca": "",
+   "patch": "",
+   "blind_hash": "",
+   "upstream_verdict": "",
+   "fix_verify": "",
+   "found_live": false,
+   "probes": "",
+   "adversarial": ""
+  },
+  "_note": "Entry shapes for the arrays above. Copy a shape when adding an entry; never edit _shapes.",
+  "fault_need": {
+   "fault_type": "",
+   "needed_by": "",
+   "available": null,
+   "user_told_at": ""
+  },
+  "recurring_warning": {
+   "property": "",
+   "runs": [],
+   "counts": [],
+   "told_user_at": "",
+   "investigation": ""
+  }
+ },
+ "live_checks": {
+  "fail_field": null
+ },
+ "report_dir": "/home/exedev/kms/zama-kms",
+ "snouty_env": "env -u ANTITHESIS_API_KEY -u ANTITHESIS_BASE_URL -u ANTITHESIS_TENANT -u ANTITHESIS_REPOSITORY snouty",
+ "snouty_bin": "/home/exedev/kms/antithesis/build/bin/snouty"
+}

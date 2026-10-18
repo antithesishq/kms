@@ -1,119 +1,158 @@
 ---
-sut_path: /home/avpai/src/customer/customer-zama/sut/kms
-commit: 4a644c8546abc8b002b7e45c19bf195996e7d229  # plus the uncommitted Antithesis kit changes (sut/kms-changes.patch)
-updated: 2026-10-14
-external_references: []
+sut_path: /home/exedev/kms
+commit: 4a644c8546abc8b002b7e45c19bf195996e7d229
+harness_commit: 3095d82afc277661a2d1629f8d31cc91bf4761f0
+updated: 2026-10-17
+external_references:
+  - path: https://docs.zama.org/protocol/protocol/overview/kms
+    why: robustness and guaranteed-output-delivery claims
 ---
 
 # SUT Analysis — Zama KMS (threshold mode)
 
-## Scope of this pass
+## Scope
 
-The user asked for **one black-box property**, not a full catalog. This analysis is scoped to
-that. It describes the whole system briefly and goes deeper only on the public-decryption path that
-the chosen property exercises. Areas listed under "Failure-prone areas" were not researched in
-depth; they are leads for a later full pass.
+Only the components and data paths that the five guarantees in [guarantees.md](guarantees.md)
+touch: public and user decryption, resharing into a new epoch, the request-ID meta stores, the
+core-to-core session layer, restart and boot, and the client CLI. Key generation, CRS generation,
+backup and custodian recovery are out of scope except where a guarantee depends on them (the
+workload needs a key). Per-property detail is in [properties/](properties/).
 
 ## Summary
 
-Zama KMS holds FHE key material and does key generation, CRS generation, public decryption, user
-decryption, and resharing. It runs either as one centralized server or as an `n`-party threshold
-MPC cluster (`ai-docs/ARCHITECTURE.md`). The Antithesis deployment in `Antithesis_RUN/` runs
-**threshold mode with n = 4, t = 1**. It uses an **insecure** build with the **mock enclave**,
-`Test` FHE parameters, and `NoiseFloodSmall` decryption mode.
+Zama KMS holds the FHE secret key of the Zama Protocol and decrypts on request. The harness runs it
+in **threshold mode, n = 4, t = 1**: four `kms-server` parties, each holding a Shamir share of the
+key, run MPC protocols to decrypt. The build is `insecure` with the mock enclave, `Test` FHE
+parameters and `NoiseFloodSmall` decryption ([tuning.md](tuning.md)). Storage is MinIO standing in
+for AWS S3. The deployment is in [deployment-topology.md](deployment-topology.md).
 
-## Architecture
+## Components the guarantees touch
 
-| Component | What it is | Interfaces |
-|---|---|---|
-| `kms-core-{1..4}` | `kms-server` binary, one per party, each a 1-replica StatefulSet | service gRPC `:50100` (`CoreServiceEndpoint`, no auth, no TLS); core-to-core gRPC `:50001` (mTLS, `[threshold.tls.auto]`, self-issued from each node's onboard CA); metrics `:9646` |
-| MinIO | S3 stand-in. Holds `kms-public` (`PUB-p<i>`) and `kms-private` (`PRIV-p<i>`) buckets per party | S3 HTTP `:9000` |
-| `kms-prepopulate-keys` Job | Runs `kms-gen-keys` for all parties before the cores start, so each core finds every peer's CA cert at boot (workaround, see `Antithesis_RUN/README.md`) | writes to MinIO |
-| `kms-core-init-threshold-init` Job | Waits for all four cores' health checks, then runs `kms-init`, which creates the default MPC context and epoch | service gRPC to all cores |
-| `kms-core-client` | Idle pod with the `kms-core-client` CLI and a generated `config.toml` (`num_majority = 2`, `num_reconstruct = 3`). Intended driver host for the workload | service gRPC to all cores; S3 reads for public material |
+| Component | What it is | Interfaces | Guarantees |
+|---|---|---|---|
+| `kms-server` (×4) | One party: service layer (`core/service`), MPC engine (`core/threshold-execution`), networking (`core/threshold-networking`) | service gRPC `:50100` (no auth, no TLS); core-to-core gRPC `:50001` (mTLS, `[threshold.tls.auto]`); metrics `:9646` | all |
+| Meta stores | In-memory table per operation type: request ID → pending / done(ok) / done(err) / deleted (`core/service/src/util/meta_store.rs`) | — | 1, 4, 5 |
+| Network session store | In-memory map session ID → `Inactive` / `Active` / `Completed` (`core/threshold-networking/src/grpc/session_store.rs`, `manager.rs`) | — | 1, 2, 5 |
+| Epoch manager | Creates epochs (PRSS init), reshares keys, rolls back on storage failure (`core/service/src/engine/threshold/service/epoch_manager.rs`) | `NewMpcEpoch`, `GetEpochResult` | 3 |
+| MinIO | `kms-public` (`PUB-p<i>/…`, anonymous read) and `kms-private` (`PRIV-p<i>/…`) | S3 HTTP `:9000` | 2, 3 (boot, reshare storage) |
+| `kms-core-client` | CLI: encrypts, fans out requests, polls, verifies signatures, majority, reconstruction, ground truth | service gRPC to every core; HTTP reads of `kms-public` | all (the driver) |
 
-### Public decryption request path (the part this pass traced)
+## Data paths
 
-1. The client encrypts a plaintext under the cluster's FHE public key, which it reads from MinIO.
-   It sends the same `PublicDecryptionRequest` (request ID, key ID, context, epoch, EIP-712 domain,
-   ciphertexts) to **every** party (`core-client/src/decrypt.rs:913`).
-2. Each party validates the request, checks the context and epoch, and takes a read guard on the FHE
-   key share. It then registers the request ID in its in-memory public-decryption meta store via
-   `add_or_redo_failed_in_meta_store` (`core/service/src/engine/threshold/service/public_decryptor.rs:373`).
-3. Each ciphertext in the batch runs its own MPC session. The session ID is derived
-   deterministically as `req_id.derive_session_id_with_counter(ctr)`
-   (`public_decryptor.rs:395`). The sessions run in parallel on the node's task tracker.
-4. Results, or the error, go into the meta store. The client polls `GetPublicDecryptionResult`
-   on every party, retrying on `Unavailable` (`decrypt.rs:956`). The other option is
-   `PublicDecryptSync`, which attaches to the same meta-store entry (`public_decryptor.rs:654`).
-5. The client accepts the result once `num_majority` (default) or all `n` (`-a`) responses arrive.
-   It checks signatures and majority agreement (`core/service/src/client/public_decryption.rs:77`).
-   In encrypt-then-decrypt mode it also checks that each response's plaintext equals what it
-   encrypted (`decrypt.rs:266-310`).
+### Public decryption (Guarantee 1, and the probe for Guarantee 2)
 
-## State
+1. The client reads every party's verification key from MinIO, connects to every core, fetches
+   the public key, and encrypts locally (randomized).
+2. It sends one `PublicDecryptionRequest` (request ID, ciphertexts with handles, key ID, context,
+   epoch, EIP-712 domain, extra data) to **every** core.
+3. Each core: rate-limiter permit → validation → context and epoch check → FHE key read guard →
+   `add_or_redo_failed_in_meta_store` → one MPC session per ciphertext, ID
+   `req_id.derive_session_id_with_counter(ctr)`, in `NetworkMode::Async`
+   (`public_decryptor.rs:266-560`).
+4. When every slot succeeds the core signs the payload once and stores it; any failure stores
+   `Done(Err)`.
+5. The client polls `GetPublicDecryptionResult` (blocks ≤ 60 s server-side while pending) or uses
+   `PublicDecryptSync`, collects `num_majority` (2) or all 4 (`-a`) responses, verifies signatures,
+   request link and agreement, then compares with the encrypted value.
 
-- **In-memory meta stores** (one per operation type) track every accepted request ID. They do not
-  survive a restart. ARCHITECTURE.md states that a reboot forgets every known request and session
-  ID, and that the external KMS connector compensates.
-- **Network session store** (`core/threshold-networking/src/grpc/session_store.rs`): a per-session-ID
-  map whose status is `Inactive` (messages buffered before the local party knows the request),
-  `Active`, or `Completed`. A background task removes `Completed` entries after a cleanup interval.
-  This store is also in memory only.
-- **Persistent storage** in MinIO: public material (keys, CRS, verification keys, CA certs) and
-  private material (key shares, `EpochData`, contexts, PRSS setups). ARCHITECTURE.md says
-  boot-time verification checks this storage and repairs public material from peers. This pass
-  did not check that claim.
+### User decryption (Guarantee 4)
+
+Same fan-out and meta-store handling (`user_decryptor.rs:467-646`). Each core masks its partial
+decryption and signcrypts it to the request's ephemeral ML-KEM key. The client needs `2t + 1` = 3
+authenticated responses, votes on the invariants, un-signcrypts, reconstructs with error
+correction, and compares with the encrypted value
+([details](properties/user-decrypt-returns-encrypted-plaintext.md)).
+
+### Resharing into a new epoch (Guarantee 3)
+
+`NewMpcEpoch` with `previous_epoch` (`epoch_manager.rs:1858`): lease, existing-epoch check
+(`InvalidArgument`), meta-store insert (`AlreadyExists`), then in the background PRSS init (stores
+`EpochData` and **registers the epoch**), the reshare protocol in Sync mode, and the storage phase
+under a per-party lock. A storage failure rolls back; a protocol failure leaves the epoch
+registered without key shares on that core. `GetEpochResult` returns signed key digests per key.
+Public material is stored per key ID, not per epoch, and must stay byte-identical
+([details](properties/reshare-preserves-key.md)).
+
+### Restart and boot (Guarantees 2 and 5)
+
+A restarted core loses its meta stores and network session store. At boot it re-stores the
+default context, loads every key share of every epoch and every `EpochData` from private storage,
+verifies public storage (repairing from peers if needed), starts the MPC server, then the service
+server, and only then reports ready (`kms_impl.rs:512-662`, `:852`;
+`observability/src/health.rs`). Readiness doesn't check peer connectivity. Peers detect the dead
+connection to the old process with HTTP/2 keepalive (15 s ping, 30 s timeout) and reconnect on the
+next send ([details](properties/recovers-after-faults.md#what-recovery-takes-step-by-step)).
+
+### Request-ID handling (Guarantee 5)
+
+Decryption IDs: unknown → new attempt; pending, succeeded or deleted → `AlreadyExists` (async) or
+attach (sync); failed → redo. Epoch IDs: any known ID → `AlreadyExists`. Everything is in memory,
+so a restart forgets every ID. A redo re-creates the same MPC session IDs, which the core's own
+session store keeps as `Completed` for 24 h, so a redo of an in-session failure fails at once unless
+the core restarted ([details](properties/decrypt-request-id-retries.md)).
+
+## The client CLI
+
+Facts every check depends on (`core-client/src/`):
+
+- **Connects to every configured core before sending** (`lib.rs:2029, 2038`, seven attempts 100 ms
+  apart, no connect timeout). A core with no ready pod refuses the connection, and the run fails
+  with exit 1. `num_parties` can be set above the number of listed cores (`lib.rs:413`), so a
+  three-core config runs public decryption while one core is down.
+- **Fresh random request ID per run**; no flag to choose one. Printed only on success.
+- **Polling:** 500 ms between polls, `--max-iter` polls (default 30), retry only on `Unavailable`;
+  `--sync` re-sends the identical request on `Unavailable` or `ResourceExhausted`.
+- **Collection stops at the quota** (`num_majority` = 2, `num_reconstruct` = 3, or all with `-a`);
+  later responses are dropped unchecked.
+- **Exit codes:** 0 success; 1 error (including wrong-result errors, told apart by text); 101 panic
+  (`new-epoch` unwraps every error); 2 bad arguments.
 
 ## Concurrency model
 
-- Tokio async runtime. Each ciphertext in a batch gets its own MPC session, spawned on the node's
-  task tracker. ARCHITECTURE.md says CPU-heavy crypto runs on Rayon pools
-  (`core/thread-handles`).
-- MPC rounds are synchronised per session. Every message carries a `round_counter`. Stale-round
-  messages are dropped, future-round messages are buffered, and only exact-round messages are
-  delivered (`core/threshold-networking/src/sending_service/session.rs:142-235`).
-- A rate limiter gates each operation type (`rate_limiter.start_pub_decrypt()`,
-  `public_decryptor.rs:275`). ARCHITECTURE.md says in-memory lifecycle leases serialize epoch and
-  context creation against destruction. This pass did not check that claim.
+- Tokio runtime (`num_tokio_threads = 2` here), Rayon pools for CPU-heavy crypto
+  (`num_rayon_threads = 8`). Each ciphertext in a batch is its own MPC session, spawned on the
+  node's task tracker.
+- MPC rounds are synchronized per session by a round counter: stale rounds dropped, future rounds
+  buffered (up to 16 rounds ahead), exact rounds delivered
+  (`core/threshold-networking/src/sending_service/session.rs:142-235`).
+- Messages for a session a party doesn't know yet are buffered in an `Inactive` entry (at most
+  1000 per sender here) and discarded after 900 s.
+- In-memory leases serialize epoch creation against destruction; a per-party lock serializes
+  reshare storage phases and rollbacks.
 
 ## Claimed guarantees (claims to test, not established facts)
 
-- The MPC protocol is described as "maliciously secure and robust" for up to `t` corrupt parties
-  (ARCHITECTURE.md, citing Noah's Ark, eprint 2023/815).
-- The client says it accepts a public-decryption plaintext only as a consensus value of at least
-  `min_agree_count` validly signed responses (`core/service/src/client/public_decryption.rs:66-73, 108-110`).
-- Retrying a failed decryption request ID resets the entry and decrypts again. Retrying a pending
-  or successful ID is rejected with `AlreadyExists`, and the sync variant attaches to it instead
-  (`util/meta_store.rs:1014-1026`, ARCHITECTURE.md "Request IDs").
+- The MPC protocol is robust for up to `t` corrupt parties (litepaper, ARCHITECTURE.md).
+- Guaranteed output delivery with offline or misbehaving nodes (KMS overview); failing nodes
+  re-join from on-disk material without `init` ([kms-server-bin.md](../../docs/guides/kms-server-bin.md)).
+- Resharing keeps the public key; a storage failure rolls back on that party
+  ([entry_points.md](../../docs/guides/entry_points.md), [ARCHITECTURE.md](../../ai-docs/ARCHITECTURE.md)).
+- The documented request-ID replies ([trust_model.md](../../docs/explanations/trust_model.md)).
 
-## Failure-prone areas (leads, not researched in this pass)
+## Failure-prone areas (leads)
 
-- **Restart, then the same request ID.** A restart wipes both the meta store and the network
-  session store. A retry with the same request ID then rebuilds sessions under the same derived
-  session IDs while peers may still be mid-protocol or `Completed` under those IDs.
-- **Retry after failure while the session is still `Completed`.** Creating a network session with an
-  ID that is not `Inactive` returns an error (`core/threshold-networking/src/grpc/manager.rs:273`).
-  A quick retry of a failed request on the same party can therefore fail until cleanup removes the
-  entry.
-- **Restart orphans the epoch.** `Antithesis_RUN/README.md` says that after a party restarts, its
-  context is rewritten with an empty epoch list, and the deploy script works around this. This is a
-  deployment-kit claim. It has **not** been checked against the code and is not a premise of any
-  property here.
-- Boot-time public-storage repair from peers, non-atomic paired material writes, reshare rollback,
-  and custodian-backup rollback (all described in ARCHITECTURE.md) are candidate areas for later
-  passes.
+- **Restart, then the same request ID.** Both stores are wiped on the restarted core while peers
+  keep `Active`/`Completed` sessions under the same derived session IDs.
+- **Redo after failure on a core that didn't restart** fails at session creation for 24 h (see
+  above). Documented as "runs again".
+- **A failed reshare leaves a registered epoch without shares** on cores that finished PRSS init.
+- **Boot reads every epoch's key material**; repeated reshares make boot slower, and a storage
+  error at boot ends the process (crash loop with back-off up to 300 s).
+- **After a reshare and a restart**, `GetKeyGenResult` answers from the largest epoch ID
+  (`kms_impl.rs:561-566`), which may not be the epoch a client names.
+- **Async decryption sessions wait up to 900 s** for a missing party (`discard_inactive_sessions_interval`),
+  not `network_timeout`.
 
 ## Assumptions
 
-- The Antithesis run uses the manifests in `antithesis/config/manifests/` unchanged:
-  4 cores, MinIO, the init Job, and the core-client pod.
-- `Test` FHE parameters keep keygen and decryption fast enough for many operations per timeline.
-  Nobody has measured this under Antithesis yet.
+- The Antithesis run uses `antithesis/config/manifests/` rendered with the `speedrun-<sha>` image
+  tag, unchanged otherwise.
+- `Test` parameters keep keygen and decryption fast enough for many operations per timeline; not
+  measured yet under Antithesis.
 
 ## Open Questions
 
-- How long do `preproc-key-gen` and `key-gen` take under Antithesis with `Test` params? This
-  decides whether the workload generates a key in a `first_` command or uses insecure keygen.
-- Should the workload target the secure keygen path (real DKG) or `insecure-key-gen`? Both produce a
-  key that public decryption can use. Secure DKG exercises far more MPC code.
+- Boot time of `kms-server` under Antithesis, and its growth with the number of epochs.
+- Whether the robust online protocols ever advance a session with more than t parties marked
+  missing (relevant to a restarted party's round alignment;
+  [details](properties/public-decrypt-returns-encrypted-plaintext.md#investigation-log)).

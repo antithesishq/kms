@@ -1,0 +1,137 @@
+engine: docker
+tag: 3095d82a
+kms source: /home/exedev/kms
+rust toolchain: 1.98.1 (from rust-toolchain.toml)
+
+=== zama-golden: Zama's rust-golden-image (docker/base/Dockerfile) ===
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.53kB done
+#1 DONE 0.1s
+
+#2 [context cgr.dev/zama.ai/glibc-dynamic:16-dev] load metadata for cgr.dev/chainguard/glibc-dynamic:latest-dev
+#2 DONE 0.7s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 372B done
+#3 DONE 0.0s
+
+#4 [context cgr.dev/zama.ai/glibc-dynamic:16-dev] cgr.dev/chainguard/glibc-dynamic:latest-dev
+#4 resolve cgr.dev/chainguard/glibc-dynamic:latest-dev 0.0s done
+#4 DONE 0.1s
+
+#4 [context cgr.dev/zama.ai/glibc-dynamic:16-dev] cgr.dev/chainguard/glibc-dynamic:latest-dev
+#4 DONE 0.4s
+
+#4 [context cgr.dev/zama.ai/glibc-dynamic:16-dev] cgr.dev/chainguard/glibc-dynamic:latest-dev
+#4 sha256:55a16f5705341bc27ec6855b9e0c257c1971960609d53a1af6e704ae0324e40d 0B / 39.09kB 0.2s
+#4 sha256:55a16f5705341bc27ec6855b9e0c257c1971960609d53a1af6e704ae0324e40d 39.09kB / 39.09kB 0.2s done
+#4 sha256:85eb7d15b350170255f5f5cdc67b58a22cdb91fc5e08dcad864e48dc6a24e13d 0B / 5.45MB 0.2s
+#4 sha256:c2c6babb1dc5973c3ad52dbcfdbff9031fa1f7d01a70966e5648683c6182a917 983.95kB / 983.95kB 0.2s done
+#4 sha256:d8bd873f5ddd5bce51d3802815fd6e946e8bb39e3382e0cf949ac2dd0b8af223 921.85kB / 921.85kB 0.2s done
+#4 sha256:85eb7d15b350170255f5f5cdc67b58a22cdb91fc5e08dcad864e48dc6a24e13d 5.45MB / 5.45MB 0.3s done
+#4 sha256:91d0f452fd84291aa123c49453ca58dde750a77675cb0446e50f42a252537924 701.23kB / 701.23kB 0.2s done
+#4 sha256:c9c56dffb98b2fd1077d189e378ea8a3121aac5e1bc1212ceb6c8a5c18c32b2c 1.09MB / 1.09MB 0.1s done
+#4 sha256:db048eeb80d91b93cde3ec47dfb4ce5fbf124bdc001254ad0f9fe0561681cf70 1.46MB / 1.46MB 0.2s done
+#4 sha256:ef4a202fb20b496fffe2e9c8663570e0f98bebe70958ab511c6a5c4e7760504c 0B / 1.35MB 0.2s
+#4 sha256:01438294447ceff3fb61e4c3a289ad04dcc62f1941485611ccc2f2e48ed7f1e0 3.15MB / 3.36MB 0.2s
+#4 sha256:ef4a202fb20b496fffe2e9c8663570e0f98bebe70958ab511c6a5c4e7760504c 1.35MB / 1.35MB 0.2s done
+#4 sha256:01438294447ceff3fb61e4c3a289ad04dcc62f1941485611ccc2f2e48ed7f1e0 3.36MB / 3.36MB 0.2s done
+#4 sha256:99431da899999096fcd09ecbce57a833b5776383d5c8ed504070d072829a9c54 2.94MB / 2.94MB 0.2s done
+#4 sha256:f30be401ae0c23d92c7a5ee1ad8aefee3be590fff8ac32252dbfc6f894b887a4 5.24MB / 10.15MB 0.3s
+#4 sha256:f30be401ae0c23d92c7a5ee1ad8aefee3be590fff8ac32252dbfc6f894b887a4 10.15MB / 10.15MB 0.4s done
+#4 extracting sha256:f30be401ae0c23d92c7a5ee1ad8aefee3be590fff8ac32252dbfc6f894b887a4
+#4 extracting sha256:f30be401ae0c23d92c7a5ee1ad8aefee3be590fff8ac32252dbfc6f894b887a4 0.2s done
+#4 DONE 1.5s
+
+#4 [context cgr.dev/zama.ai/glibc-dynamic:16-dev] cgr.dev/chainguard/glibc-dynamic:latest-dev
+#4 extracting sha256:01438294447ceff3fb61e4c3a289ad04dcc62f1941485611ccc2f2e48ed7f1e0 0.1s done
+#4 extracting sha256:99431da899999096fcd09ecbce57a833b5776383d5c8ed504070d072829a9c54 0.1s done
+#4 DONE 1.6s
+
+#4 [context cgr.dev/zama.ai/glibc-dynamic:16-dev] cgr.dev/chainguard/glibc-dynamic:latest-dev
+#4 extracting sha256:ef4a202fb20b496fffe2e9c8663570e0f98bebe70958ab511c6a5c4e7760504c 0.0s done
+#4 extracting sha256:db048eeb80d91b93cde3ec47dfb4ce5fbf124bdc001254ad0f9fe0561681cf70 0.1s done
+#4 extracting sha256:c9c56dffb98b2fd1077d189e378ea8a3121aac5e1bc1212ceb6c8a5c18c32b2c 0.0s done
+#4 DONE 1.8s
+
+#4 [context cgr.dev/zama.ai/glibc-dynamic:16-dev] cgr.dev/chainguard/glibc-dynamic:latest-dev
+#4 extracting sha256:91d0f452fd84291aa123c49453ca58dde750a77675cb0446e50f42a252537924 0.1s done
+#4 extracting sha256:d8bd873f5ddd5bce51d3802815fd6e946e8bb39e3382e0cf949ac2dd0b8af223 0.0s done
+#4 DONE 1.9s
+
+#4 [context cgr.dev/zama.ai/glibc-dynamic:16-dev] cgr.dev/chainguard/glibc-dynamic:latest-dev
+#4 extracting sha256:c2c6babb1dc5973c3ad52dbcfdbff9031fa1f7d01a70966e5648683c6182a917 0.1s done
+#4 extracting sha256:85eb7d15b350170255f5f5cdc67b58a22cdb91fc5e08dcad864e48dc6a24e13d 0.1s done
+#4 DONE 2.1s
+
+#4 [context cgr.dev/zama.ai/glibc-dynamic:16-dev] cgr.dev/chainguard/glibc-dynamic:latest-dev
+#4 extracting sha256:55a16f5705341bc27ec6855b9e0c257c1971960609d53a1af6e704ae0324e40d 0.1s done
+#4 DONE 2.1s
+
+#5 [prod 1/4] RUN --mount=type=cache,target=/var/cache/apk,sharing=locked     --mount=type=cache,target=/var/lib/apk,sharing=locked     apk add --no-cache     curl     wget     bash     git     make     perl     binutils     gcc     libstdc++     linux-headers     build-base     openssl-dev     protoc     protobuf
+#5 0.348 fetch https://apk.cgr.dev/chainguard/x86_64/APKINDEX.tar.gz
+#5 1.407 (1/28) Installing libzstd1 (1.5.7-r10)
+#5 1.688 (2/28) Installing binutils (2.47-r1)
+#5 2.298 (3/28) Installing libxcrypt-dev (4.5.2-r6)
+#5 2.480 (4/28) Installing linux-headers (7.2.11-r0)
+#5 2.703 (5/28) Installing glibc-2.44-dev (2.44-r8)
+#5 3.191 (6/28) Installing libquadmath (16.2.0-r1)
+#5 3.349 (7/28) Installing libstdc++-dev (16.2.0-r1)
+#5 3.806 (8/28) Installing openssf-compiler-options (20250904-r11)
+#5 3.976 (9/28) Installing posix-cc-wrappers (2-r10)
+#5 4.124 (10/28) Installing libatomic (16.2.0-r1)
+#5 4.242 (11/28) Installing gmp (6.3.0-r10)
+#5 4.393 (12/28) Installing libgomp (16.2.0-r1)
+#5 4.514 (13/28) Installing isl (0.28-r4)
+#5 4.708 (14/28) Installing mpfr (4.2.2-r3)
+#5 4.853 (15/28) Installing mpc (1.4.1-r1)
+#5 59.72 (16/28) Installing gcc (16.2.0-r1)
+#5 62.76 (17/28) Installing make (4.4.1-r15)
+#5 62.91 (18/28) Installing pkgconf (3.0.9-r0)
+#5 63.03 (19/28) Installing build-base (1-r10)
+#5 63.18 (20/28) Installing curl (8.23.0-r0)
+#5 63.34 (21/28) Installing openssl-4.0-dev (4.0.3-r7)
+#5 63.81 (22/28) Installing libbz2-1 (1.0.8-r25)
+#5 63.94 (23/28) Installing perl (5.44.0-r1)
+#5 64.51 (24/28) Installing libabsl2608.0.0 (20260817.0-r4)
+#5 64.75 (25/28) Installing libprotoc36.2.0 (36.2-r0)
+#5 65.01 (26/28) Installing libprotobuf36.2.0 (36.2-r0)
+#5 65.27 (27/28) Installing protobuf (36.2-r0)
+#5 65.45 (28/28) Installing protoc (36.2-r0)
+#5 65.65 Executing busybox-1.38.0-r3.trigger
+#5 66.45 OK: 655 MiB in 71 packages
+#5 DONE 66.7s
+
+#6 [prod 2/4] RUN set -eux;     arch="$(uname -m)";     case "$arch" in         x86_64)  triple=x86_64-unknown-linux-musl ;;         aarch64) triple=aarch64-unknown-linux-musl ;;         *) echo "unsupported arch: $arch" >&2; exit 1 ;;     esac;     curl -fsSL "https://github.com/mozilla/sccache/releases/download/v0.15.0/sccache-v0.15.0-${triple}.tar.gz"         | tar -xz --strip-components=1 -C /usr/local/bin "sccache-v0.15.0-${triple}/sccache";     chmod +x /usr/local/bin/sccache;     sccache --version
+#6 0.311 + uname -m
+#6 0.312 + arch=x86_64
+#6 0.312 + triple=x86_64-unknown-linux-musl
+#6 0.312 + curl -fsSL https://github.com/mozilla/sccache/releases/download/v0.15.0/sccache-v0.15.0-x86_64-unknown-linux-musl.tar.gz
+#6 0.312 + tar -xz '--strip-components=1' -C /usr/local/bin sccache-v0.15.0-x86_64-unknown-linux-musl/sccache
+#6 0.651 + chmod +x /usr/local/bin/sccache
+#6 0.652 + sccache --version
+#6 0.653 sccache 0.15.0
+#6 DONE 0.7s
+
+#7 [prod 3/4] RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain=1.98.1 &&     . /root/.cargo/env
+#7 0.356 info: downloading installer
+#7 336.9 warn: curl: (92) HTTP/2 stream 1 reset by server (error 0x1 PROTOCOL_ERROR)
+#7 336.9 error: command failed: downloader https://static.rust-lang.org/rustup/dist/x86_64-unknown-linux-gnu/rustup-init /tmp/tmp.D6rWT4/rustup-init x86_64-unknown-linux-gnu
+#7 ERROR: process "/bin/sh -c curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain=$RUST_IMAGE_VERSION &&     . $CARGO_HOME/env" did not complete successfully: exit code: 1
+------
+ > [prod 3/4] RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain=1.98.1 &&     . /root/.cargo/env:
+0.356 info: downloading installer
+336.9 warn: curl: (92) HTTP/2 stream 1 reset by server (error 0x1 PROTOCOL_ERROR)
+336.9 error: command failed: downloader https://static.rust-lang.org/rustup/dist/x86_64-unknown-linux-gnu/rustup-init /tmp/tmp.D6rWT4/rustup-init x86_64-unknown-linux-gnu
+------
+Dockerfile:45
+--------------------
+  44 |     # Install Rust toolchain
+  45 | >>> RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain=$RUST_IMAGE_VERSION && \
+  46 | >>>     . $CARGO_HOME/env
+  47 |     
+--------------------
+ERROR: failed to build: failed to solve: process "/bin/sh -c curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain=$RUST_IMAGE_VERSION &&     . $CARGO_HOME/env" did not complete successfully: exit code: 1
+build exit=1

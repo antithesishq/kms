@@ -1,0 +1,34 @@
+engine: podman
+tag: 3095d82a
+kms source: /home/exedev/kms
+rust toolchain: 1.98.1 (from rust-toolchain.toml)
+
+=== zama-golden: Zama's rust-golden-image (docker/base/Dockerfile) ===
+STEP 1/14: FROM cgr.dev/chainguard/glibc-dynamic:latest-dev AS prod
+Trying to pull cgr.dev/chainguard/glibc-dynamic:latest-dev...
+Getting image source signatures
+Copying blob sha256:c9c56dffb98b2fd1077d189e378ea8a3121aac5e1bc1212ceb6c8a5c18c32b2c
+Copying blob sha256:ef4a202fb20b496fffe2e9c8663570e0f98bebe70958ab511c6a5c4e7760504c
+Copying blob sha256:f30be401ae0c23d92c7a5ee1ad8aefee3be590fff8ac32252dbfc6f894b887a4
+Copying blob sha256:01438294447ceff3fb61e4c3a289ad04dcc62f1941485611ccc2f2e48ed7f1e0
+Copying blob sha256:99431da899999096fcd09ecbce57a833b5776383d5c8ed504070d072829a9c54
+Copying blob sha256:db048eeb80d91b93cde3ec47dfb4ce5fbf124bdc001254ad0f9fe0561681cf70
+Copying blob sha256:91d0f452fd84291aa123c49453ca58dde750a77675cb0446e50f42a252537924
+Copying blob sha256:d8bd873f5ddd5bce51d3802815fd6e946e8bb39e3382e0cf949ac2dd0b8af223
+Copying blob sha256:c2c6babb1dc5973c3ad52dbcfdbff9031fa1f7d01a70966e5648683c6182a917
+Copying blob sha256:85eb7d15b350170255f5f5cdc67b58a22cdb91fc5e08dcad864e48dc6a24e13d
+Copying blob sha256:55a16f5705341bc27ec6855b9e0c257c1971960609d53a1af6e704ae0324e40d
+Copying config sha256:2d7dceb83f7de8f53481d6ec00f8c3ff3fa8f52155b977359491f5d1f856d627
+Writing manifest to image destination
+STEP 2/14: ARG RUST_IMAGE_VERSION=stable
+--> 50fd68abf9d4
+STEP 3/14: ARG SCCACHE_VERSION=v0.15.0
+--> ddbd5410ba60
+STEP 4/14: USER root
+--> 5f296fa767ae
+STEP 5/14: RUN --mount=type=cache,target=/var/cache/apk,sharing=locked     --mount=type=cache,target=/var/lib/apk,sharing=locked     apk add --no-cache     curl     wget     bash     git     make     perl     binutils     gcc     libstdc++     linux-headers     build-base     openssl-dev     protoc     protobuf
+error running container: from /usr/bin/runc creating container for [/bin/sh -c apk add --no-cache     curl     wget     bash     git     make     perl     binutils     gcc     libstdc++     linux-headers     build-base     openssl-dev     protoc     protobuf]: time="2026-10-17T16:14:28Z" level=error msg="runc create failed: invalid mount &{Source:/var/tmp/buildah3597131922/mnt/buildah-bind-target-11 Destination:/var/cache/apk Device:bind Flags:20480 ClearedFlags:1 PropagationFlags:[1048576] Data:z Relabel: RecAttr:<nil> Extensions:0 IDMapping:<nil>}: bind mounts cannot have any filesystem-specific options applied"
+: exit status 1
+time="2026-10-17T16:14:28Z" level=error msg="did not get container create message from subprocess: EOF"
+Error: building at STEP "RUN --mount=type=cache,target=/var/cache/apk,sharing=locked --mount=type=cache,target=/var/lib/apk,sharing=locked apk add --no-cache     curl     wget     bash     git     make     perl     binutils     gcc     libstdc++     linux-headers     build-base     openssl-dev     protoc     protobuf": while running runtime: exit status 1
+build exit=1

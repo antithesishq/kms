@@ -1,0 +1,117 @@
+{
+  "completed_at": "2026-10-18T04:52:53Z",
+  "created_at": "2026-10-18T00:31:10Z",
+  "creator": {
+    "name": "zama",
+    "type": "snouty"
+  },
+  "description": "speedrun hunt current #1: default fault set (network, pod stop/kill, clock jumps), 4 h, turbo",
+  "launcher": "Advanced Kubernetes test",
+  "links": {
+    "triage_report": "https://zama.antithesis.com/report/RQ8Cbp-xGNyv2LzRK7QJhdaS/Q4j24Mga4r9vKq6G1GGKGJhmWP0f7ZtlCtPmgF4J-dU.html?auth=v2.public.eyJzY29wZSI6eyJSZXBvcnRTY29wZVYxIjp7ImFzc2V0IjoiUTRqMjRNZ2E0cjl2S3E2RzFHR0tHSmhtV1AwZjdadGxDdFBtZ0Y0Si1kVS5odG1sIiwicmVwb3J0X2lkIjoiUlE4Q2JwLXhHTnl2Mkx6Uks3UUpoZGFTIn19LCJuYmYiOiIyMDI2LTEwLTE4VDAzOjUyOjUyLjkwNzU2NjUzOVoiffXOyyh90TorAK1eQ08RnDaqV3Hiuf4ZXbyxANa4Qh-8Ku_qk3g7JPpHFH0alZBWKDgpmQ1bzWKzpgv7_81JSwI"
+  },
+  "parameters": {
+    "antithesis.config_image": "snouty-config@sha256:fd9411478ad12e51b6eed34e37fb42ef5bb2209783c514609e07bae526fc6c7a",
+    "antithesis.description": "speedrun hunt current #1: default fault set (network, pod stop/kill, clock jumps), 4 h, turbo",
+    "antithesis.duration": "240",
+    "antithesis.is_ephemeral": "false",
+    "antithesis.performance_tier": "turbo",
+    "antithesis.source": "speedrun",
+    "custom.timing_fuzzing": "false",
+    "custom.vm_memory_mb": "0",
+    "attrs.tool": "speedrun",
+    "antithesis.integrations.type": "none",
+    "custom.container_faults_kill_exclusion_patterns": "^kms-core-client,^minio-",
+    "attrs.build": "current",
+    "attrs.system": "kms",
+    "custom.enabled_faults": "network,pod_stop,pod_kill,clock_jitter",
+    "custom.pause_fault_injector": "false",
+    "custom.smoke_test_seconds": "100",
+    "attrs.ref": "3095d82a",
+    "custom.pod_fault_interval_seconds": "300",
+    "custom.strobe_chaos_seconds": "60",
+    "antithesis.test_name": "speedrun/zama-kms/kms@3095d82a",
+    "custom.strobe_quiet_max_seconds": "0",
+    "custom.strobe_quiet_min_seconds": "20",
+    "run.caller_type": "snouty",
+    "custom.container_faults_stop_exclusion_patterns": "^kms-core-client,^minio-",
+    "antithesis.is_setup": "false",
+    "vcs.repo_branch": "antithesis-poc-speedrun",
+    "custom.manifests_path": "/opt/config/manifests",
+    "attrs.customer": "zama-kms",
+    "vcs.version_id": "3095d82afc277661a2d1629f8d31cc91bf4761f0",
+    "attrs.purpose": "hunt",
+    "custom.post_setup_settle_seconds": "100"
+  },
+  "results": {
+    "environment": {
+      "antithesis_version": "v64-4",
+      "images": [
+        {
+          "name": "snouty-config",
+          "image": "us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/snouty-config@sha256:a31ddec6a2de4cd4758bcb12df6ae9407ae1618893824c89f2173caaf4bce599",
+          "created": "2026-10-17T22:43:30.97394867Z"
+        },
+        {
+          "name": "mirrored-coredns-coredns",
+          "image": "docker.io/rancher/mirrored-coredns-coredns@sha256:884b72dd6d2f7d367902af420605e0288dffedb0516ce29330423ae3f8f5c6fa",
+          "created": "2026-04-22T12:43:42.180783644Z"
+        },
+        {
+          "name": "mc-mirror",
+          "image": "docker.io/scnd/mc-mirror@sha256:8d62e7ce5ee3a5320cc2c5eca36b781340aff30da14b8f9057cc0f9efeaec031",
+          "tag": "RELEASE.2025-02-04T04-57-50Z",
+          "created": "2025-02-04T06:46:14.407252166Z"
+        },
+        {
+          "name": "minio-mirror",
+          "image": "docker.io/scnd/minio-mirror@sha256:52dfd5c0bbd38d3219f2058c7af216d9f9a27a994b7b5baad09bbd38866015ff",
+          "tag": "RELEASE.2025-09-07T16-13-09Z",
+          "created": "2025-09-07T18:42:37.017942402Z"
+        },
+        {
+          "name": "local-path-provisioner",
+          "image": "docker.io/rancher/local-path-provisioner@sha256:67f83d34746a637da2141ae38ab547a1d7edc440e794c42239c0fb908296bdfc",
+          "created": "2026-05-08T17:32:52.406867067Z"
+        },
+        {
+          "name": "busybox",
+          "image": "docker.io/library/busybox@sha256:6be969a074d06073a62ad8ccfd2ad6ec2790cae25d519d8df255ba24819d96f0",
+          "created": "2024-09-26T21:31:42Z"
+        },
+        {
+          "name": "mirrored-pause",
+          "image": "docker.io/rancher/mirrored-pause@sha256:7c38f24774e3cbd906d2d33c38354ccf787635581c122965132c9bd309754d4a",
+          "created": "2024-05-23T20:42:04.96991089Z"
+        },
+        {
+          "name": "core-client",
+          "image": "us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-client@sha256:8d4359d01542db8cf6fb8d61d1b67838f08dcc44b34664a5a3756983c92f20a0",
+          "tag": "speedrun-3095d82a",
+          "created": "2026-10-17T18:57:29.05585588Z"
+        },
+        {
+          "name": "core-service-probe",
+          "image": "us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-service-probe@sha256:581352b51bbb43868252502a2344faf7b637af1706137c741056f59631ce3894",
+          "tag": "speedrun-3095d82a",
+          "created": "2026-10-17T18:57:27.790230498Z"
+        },
+        {
+          "name": "core-service",
+          "image": "us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-service@sha256:9305b73c08f471031198308834ef43bc826a5e636906c84368de20343ba4474c",
+          "tag": "speedrun-3095d82a",
+          "created": "2026-10-17T18:57:26.404806403Z"
+        },
+        {
+          "name": "init-envsubst",
+          "image": "us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/init-envsubst@sha256:25801547a294390e3b2d8d788fd71d22aaf58c293b891f8600a1e9a303eb82b3",
+          "tag": "speedrun-3095d82a",
+          "created": "2026-10-17T18:57:39.24621299Z"
+        }
+      ]
+    }
+  },
+  "run_id": "8196fb3cff90b7a677b4394f5e24e550-64-4",
+  "started_at": "2026-10-18T00:31:10Z",
+  "status": "completed"
+}

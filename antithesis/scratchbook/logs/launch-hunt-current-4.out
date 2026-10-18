@@ -1,0 +1,29 @@
+Building config image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/snouty-config:20261018-055944-b4d1
+Pushing config image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/snouty-config:20261018-055944-b4d1
+Config image pushed successfully: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/snouty-config@sha256:dcbff4ff88f58f7aa1126776418498f544c8dc3ff468e0017a37b97c11a5a9b4
+
+Requesting Antithesis test run with params:
+{
+  "antithesis.test_name": "speedrun/zama-kms/kms@3095d82a",
+  "antithesis.description": "speedrun hunt current #4: level 3 with the test VM at 16 GiB (custom.vm_memory_mb=16384), 105 m, turbo: does peak memory keep growing (leak) or stop below the larger limit (command backlog)",
+  "antithesis.duration": "105",
+  "antithesis.source": "speedrun",
+  "antithesis.config_image": "snouty-config@sha256:dcbff4ff88f58f7aa1126776418498f544c8dc3ff468e0017a37b97c11a5a9b4",
+  "attrs.tool": "speedrun",
+  "attrs.customer": "zama-kms",
+  "attrs.system": "kms",
+  "attrs.purpose": "hunt",
+  "attrs.build": "current",
+  "attrs.ref": "3095d82a",
+  "antithesis.performance_tier": "turbo",
+  "custom.enabled_faults": "network,pod_stop,pod_kill,clock_jitter",
+  "custom.vm_memory_mb": "16384",
+  "custom.container_faults_stop_exclusion_patterns": "^kms-core-client,^minio-",
+  "custom.container_faults_kill_exclusion_patterns": "^kms-core-client,^minio-",
+  "vcs.repo_branch": "antithesis-poc-speedrun",
+  "vcs.version_id": "3095d82afc277661a2d1629f8d31cc91bf4761f0",
+  "run.caller_type": "snouty"
+}
+{
+  "runId": "6111d172031d2759747024bdb638b01a-64-4"
+}

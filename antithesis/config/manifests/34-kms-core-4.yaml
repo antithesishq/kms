@@ -13,6 +13,11 @@
 # dropped, Helm hook annotations replaced with kapp ordering. See
 # antithesis/scratchbook/k8s-minimization/working.md.
 #
+# One behaviour change to the chart's init container `kms-core-init-load-env`: it
+# retries the peer CA certificate fetch until it has all four (up to 600 s, then it
+# exits non-zero), instead of writing an empty certificate into kms-server.toml when
+# MinIO does not answer. See the comment in the script.
+#
 # `kms-core-4-core-4` is load-bearing: it is the pod name, the per-pod Service name,
 # the MPC identity and the TLS subject all at once. Do not rename it.
 ---
@@ -123,55 +128,58 @@ spec:
           export KMS_CORE__PUBLIC_VAULT__STORAGE__S3__PREFIX="${KMS_CORE__PUBLIC_VAULT__STORAGE__S3__PREFIX:=PUB-p4}"
           export KMS_CORE__PRIVATE_VAULT__STORAGE__S3__BUCKET="${KMS_CORE__PRIVATE_VAULT__STORAGE__S3__BUCKET:=kms-private}"
           export KMS_CORE__PRIVATE_VAULT__STORAGE__S3__PREFIX="${KMS_CORE__PRIVATE_VAULT__STORAGE__S3__PREFIX:=PRIV-p4}"
-          # Fetch CA certificates for all peers (needed for peer verification)
-          # In minio/localstack context: CORE_CLIENT__S3_ENDPOINT is just the endpoint, need to add bucket
-          # In AWS context: CORE_CLIENT__S3_ENDPOINT already contains the bucket path
+          # Fetch the CA certificate of every peer (needed for peer verification). Each
+          # party's certificate is at PUB-p<i>/CACert/<signing key id> in MinIO.
+          # Antithesis harness change: the chart's version lists and downloads each one once
+          # with `curl -s` and, if the listing comes back empty, only warns and writes an
+          # empty `tls_cert.pem` into kms-server.toml. kms-server then cannot start, and the
+          # init container never re-runs on a container restart, so the core stays down until
+          # its pod is deleted again. Here every certificate is retried until it is fetched
+          # and is a PEM certificate. After 600 s the container exits non-zero, which shows
+          # up as an init failure and makes kubelet run it again.
           S3_BASE_URL="${CORE_CLIENT__S3_ENDPOINT}/kms-public"
           echo "Fetching TLS certificates from S3 base URL: ${S3_BASE_URL}"
-          # For AWS enclave: use S3 list to discover the cert path
-          echo "Looking for CA cert for party 1 at: ${S3_BASE_URL}?list-type=2&prefix=PUB-p1/CACert/"
-          BUCKET_PATH_1=$(curl -s "${S3_BASE_URL}?list-type=2&prefix=PUB-p1/CACert/" | grep -o "<Key>[^<]*</Key>" | sed "s/<Key>//;s/<\/Key>//")
-          echo "Found bucket path: ${BUCKET_PATH_1}"
-          if [ -n "${BUCKET_PATH_1}" ]; then
-            curl -s -o ./ca_pem_1 "${S3_BASE_URL}/${BUCKET_PATH_1}"
-            export KMS_CA_PEM_1="\"\"\"$(cat ./ca_pem_1)\"\"\""
-            echo "Fetched CA cert for party 1"
-          else
-            echo "WARNING: No CA cert found for party 1"
-          fi
-          # For AWS enclave: use S3 list to discover the cert path
-          echo "Looking for CA cert for party 2 at: ${S3_BASE_URL}?list-type=2&prefix=PUB-p2/CACert/"
-          BUCKET_PATH_2=$(curl -s "${S3_BASE_URL}?list-type=2&prefix=PUB-p2/CACert/" | grep -o "<Key>[^<]*</Key>" | sed "s/<Key>//;s/<\/Key>//")
-          echo "Found bucket path: ${BUCKET_PATH_2}"
-          if [ -n "${BUCKET_PATH_2}" ]; then
-            curl -s -o ./ca_pem_2 "${S3_BASE_URL}/${BUCKET_PATH_2}"
-            export KMS_CA_PEM_2="\"\"\"$(cat ./ca_pem_2)\"\"\""
-            echo "Fetched CA cert for party 2"
-          else
-            echo "WARNING: No CA cert found for party 2"
-          fi
-          # For AWS enclave: use S3 list to discover the cert path
-          echo "Looking for CA cert for party 3 at: ${S3_BASE_URL}?list-type=2&prefix=PUB-p3/CACert/"
-          BUCKET_PATH_3=$(curl -s "${S3_BASE_URL}?list-type=2&prefix=PUB-p3/CACert/" | grep -o "<Key>[^<]*</Key>" | sed "s/<Key>//;s/<\/Key>//")
-          echo "Found bucket path: ${BUCKET_PATH_3}"
-          if [ -n "${BUCKET_PATH_3}" ]; then
-            curl -s -o ./ca_pem_3 "${S3_BASE_URL}/${BUCKET_PATH_3}"
-            export KMS_CA_PEM_3="\"\"\"$(cat ./ca_pem_3)\"\"\""
-            echo "Fetched CA cert for party 3"
-          else
-            echo "WARNING: No CA cert found for party 3"
-          fi
-          # For AWS enclave: use S3 list to discover the cert path
-          echo "Looking for CA cert for party 4 at: ${S3_BASE_URL}?list-type=2&prefix=PUB-p4/CACert/"
-          BUCKET_PATH_4=$(curl -s "${S3_BASE_URL}?list-type=2&prefix=PUB-p4/CACert/" | grep -o "<Key>[^<]*</Key>" | sed "s/<Key>//;s/<\/Key>//")
-          echo "Found bucket path: ${BUCKET_PATH_4}"
-          if [ -n "${BUCKET_PATH_4}" ]; then
-            curl -s -o ./ca_pem_4 "${S3_BASE_URL}/${BUCKET_PATH_4}"
-            export KMS_CA_PEM_4="\"\"\"$(cat ./ca_pem_4)\"\"\""
-            echo "Fetched CA cert for party 4"
-          else
-            echo "WARNING: No CA cert found for party 4"
-          fi
+          # fetch_ca N: list PUB-pN/CACert/ and download the certificate to ./ca_pem_N.
+          fetch_ca() {
+            ca_path=$(curl -sf --connect-timeout 5 --max-time 20 "${S3_BASE_URL}?list-type=2&prefix=PUB-p$1/CACert/" | grep -o "<Key>[^<]*</Key>" | sed "s/<Key>//;s/<\/Key>//" | head -n 1)
+            if [ -z "${ca_path}" ]; then
+              echo "No CA cert listed for party $1 yet"
+              return 1
+            fi
+            if ! curl -sf --connect-timeout 5 --max-time 20 -o "./ca_pem_$1.tmp" "${S3_BASE_URL}/${ca_path}"; then
+              echo "Download of ${ca_path} failed"
+              return 1
+            fi
+            if ! grep -q -e "-----BEGIN CERTIFICATE-----" "./ca_pem_$1.tmp"; then
+              echo "${ca_path} is not a PEM certificate"
+              return 1
+            fi
+            mv "./ca_pem_$1.tmp" "./ca_pem_$1"
+            echo "Fetched CA cert for party $1 from ${ca_path}"
+          }
+          # Seconds since boot: unlike the wall clock, it does not jump.
+          uptime_s() { cut -d. -f1 /proc/uptime; }
+          give_up_at=$(( $(uptime_s) + 600 ))
+          missing="1 2 3 4"
+          while true; do
+            still_missing=""
+            for i in ${missing}; do
+              fetch_ca "${i}" || still_missing="${still_missing} ${i}"
+            done
+            missing="${still_missing}"
+            if [ -z "${missing}" ]; then
+              break
+            fi
+            if [ "$(uptime_s)" -ge "${give_up_at}" ]; then
+              echo "ERROR: no CA certificate for parties${missing} after 600 s; exiting non-zero so that kubelet retries" >&2
+              exit 1
+            fi
+            sleep 5
+          done
+          export KMS_CA_PEM_1="\"\"\"$(cat ./ca_pem_1)\"\"\""
+          export KMS_CA_PEM_2="\"\"\"$(cat ./ca_pem_2)\"\"\""
+          export KMS_CA_PEM_3="\"\"\"$(cat ./ca_pem_3)\"\"\""
+          export KMS_CA_PEM_4="\"\"\"$(cat ./ca_pem_4)\"\"\""
           # Fetch private key only for this party (party 4)
           # mockEnclave: [threshold.tls.auto] generates its own ephemeral key, nothing to fetch.
           echo "### BEGIN - env ###"

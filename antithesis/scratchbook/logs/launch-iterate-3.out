@@ -1,0 +1,28 @@
+Building config image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/snouty-config:20261017-224330-60d9
+Pushing config image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/snouty-config:20261017-224330-60d9
+Config image pushed successfully: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/snouty-config@sha256:31d1b89e008ac1e50b0aefae6d215571d4b2c51da29da9f32b6e8e05d094f9fd
+
+Requesting Antithesis test run with params:
+{
+  "antithesis.test_name": "speedrun/zama-kms/kms@3095d82a",
+  "antithesis.description": "speedrun iterate #3: adds the Guarantee 3 public-key check and source-epoch decrypt, and the Guarantee 4 user-decryption driver; fault level 2 (network,pod_kill, 600 s)",
+  "antithesis.duration": "30",
+  "antithesis.source": "speedrun",
+  "antithesis.config_image": "snouty-config@sha256:31d1b89e008ac1e50b0aefae6d215571d4b2c51da29da9f32b6e8e05d094f9fd",
+  "attrs.tool": "speedrun",
+  "attrs.customer": "zama-kms",
+  "attrs.system": "kms",
+  "attrs.purpose": "iterate",
+  "attrs.build": "current",
+  "attrs.ref": "3095d82a",
+  "custom.enabled_faults": "network,pod_kill",
+  "custom.pod_fault_interval_seconds": "600",
+  "custom.container_faults_stop_exclusion_patterns": "^kms-core-client,^minio-",
+  "custom.container_faults_kill_exclusion_patterns": "^kms-core-client,^minio-",
+  "vcs.repo_branch": "antithesis-poc-speedrun",
+  "vcs.version_id": "3095d82afc277661a2d1629f8d31cc91bf4761f0",
+  "run.caller_type": "snouty"
+}
+{
+  "runId": "5a41ff4512a62b259c30d0cf245647d8-64-4"
+}

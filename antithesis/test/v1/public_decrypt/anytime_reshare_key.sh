@@ -1,17 +1,44 @@
 #!/bin/sh
-# Reshares the workload's FHE key into a new epoch of the default context. The decryption
-# driver also decrypts under the epochs that this command records (pick_epoch in
-# helper_lib.sh), so its plaintext check covers the reshared key shares too.
+# Reshares the workload's FHE key into a new epoch, then checks that the key is still the same
+# key: its public key is unchanged and the epoch it was reshared from still decrypts correctly.
 #
 # kms-core-client new-epoch sends the reshare to all four cores and polls each core for the
 # result. It then checks that every result names the key and preprocessing IDs that were
 # sent, and that the signature of every result verifies over the published key material. The
 # CLI succeeds only when all four cores report success, but the protocol tolerates one faulty
 # party. A failed run can therefore leave an epoch that some cores hold and others do not.
-# Such an epoch is recorded as unconfirmed, and the decryption driver tries it less often.
+# Such an epoch is recorded as unconfirmed, and the decryption drivers try it less often. The
+# drivers decrypt under the epochs that this command records (pick_epoch in helper_lib.sh),
+# so their plaintext checks cover the reshared key shares too.
+#
+# Public key. Public material is stored per key ID, not per epoch, so a reshare must leave it
+# byte-identical. Before the reshare the command reads PUB-p<i>/PublicKey/<key_id> of all four
+# parties from MinIO and takes each one's digest; after new-epoch returns, done or not, it
+# reads them again. A party whose object could not be read either time (a network fault) is
+# left out; one that was there before and is gone after (404) counts as changed.
+#
+# Source epoch. After the reshare, done or not, the command runs one public decryption of a
+# fresh value under the epoch it reshared from, with up to 2 attempts. A reshare that panicked
+# or timed out may have taken effect on some cores and not on others, but either way the
+# source epoch must keep its key shares. Availability is not checked here: an attempt without
+# a verdict is allowed, only a wrong plaintext is a failure. As in the driver, an attempt that
+# could not connect to a core is followed by one that leaves that core out (three-core config).
 #
 # This is an anytime command. It runs alongside the decryption drivers, as an operator's
 # reshare would, and copies of it can run at the same time. Each run uses a fresh epoch ID.
+#
+# Checks (Guarantee 3):
+# - Always: every core's reshare result names the reshared key and its signature verifies over
+#   the published key material (new-epoch's own checks).
+# - Always: the public key every party publishes for the key is unchanged by the reshare.
+# - Always: a public decryption under the source epoch after the reshare carries the encrypted
+#   plaintext.
+# - Sometimes: the public key was read back unchanged after a reshare that ended without a
+#   verdict (judged on every such reshare).
+# - Sometimes: a decryption under the source epoch succeeded after a reshare that ended without
+#   a verdict (judged on every attempt after such a reshare).
+# - Reachable: a reshare from an epoch that a reshare created succeeded; a reshare ended
+#   without a verdict.
 . "$(dirname "$0")/helper_lib.sh"
 declare_catalog
 
@@ -56,6 +83,8 @@ fi
 
 previous="context_id:$DEFAULT_CONTEXT_ID;epoch_id:$source_epoch;previous_keys:[key_id=$key_id,preproc_id=$preproc_id,$digest_field=$keyset_digest,public_key_digest=$public_key_digest]"
 
+pk_before=$(public_key_digests "$key_id" before)
+
 # --max-iter counts 0.5 s result polls per core.
 set -- -f config.toml --max-iter 1200 new-epoch --new-epoch-id "$new_epoch" \
   --new-context-id "$DEFAULT_CONTEXT_ID" --previous-epoch-params "$previous"
@@ -76,36 +105,111 @@ wrong_result() {
     cli.out
 }
 
+# The outcome: done (every core reported success and the CLI's checks passed), wrong (a core
+# reported a result that fails the CLI's checks) or failed (no verdict).
+exit_code=0
 if [ "$rc" -eq 0 ] && grep -q 'New epoch created' cli.out; then
+  outcome=done
   record_epoch "$new_epoch" "$key_id" confirmed
   details="{$inputs}"
   assert_always "$MSG_RESHARE_RESULT" true "$details"
   if [ "$source_epoch" != "$DEFAULT_EPOCH_ID" ]; then
     assert_reachable "$MSG_RESHARE_CHAINED" "$details"
   fi
-  exit 0
-fi
-
-if err=$(wrong_result); then
+elif err=$(wrong_result); then
+  outcome=wrong
   # The cores consider the epoch done, so decryptions under it are worth a try as well.
   record_epoch "$new_epoch" "$key_id" unconfirmed
   assert_always "$MSG_RESHARE_RESULT" false "{$inputs,\"error\":\"$(json_str "$err")\"}"
   cat cli.out
-  exit 1
-fi
-
-# The CLI's argument parser exits with 2, so this script built a malformed command.
-if [ "$rc" -eq 2 ]; then
+  exit_code=1
+elif [ "$rc" -eq 2 ]; then
+  # The CLI's argument parser exits with 2, so this script built a malformed command.
   echo "kms-core-client rejected the arguments"
   cat cli.out
   exit 1
+else
+  # Any other failure is a reshare that did not finish everywhere: a core was down, slow or
+  # cut off, or it rejected the request. The CLI reports a failed reshare as a panic, and the
+  # gRPC status carries only the code. The epoch is kept, because the other cores can
+  # complete it.
+  outcome=failed
+  record_epoch "$new_epoch" "$key_id" unconfirmed
+  err=$(grep -m 1 -A 2 'panicked at' cli.out || tail -n 3 cli.out)
+  assert_reachable "$MSG_RESHARE_NO_VERDICT" "{$inputs,\"error\":\"$(json_str "$err")\"}"
+  tail -n 20 cli.out
+fi
+inputs="$inputs,\"outcome\":\"$outcome\""
+
+# Public key: compare every party that was read both before and after.
+pk_after=$(public_key_digests "$key_id" after)
+compared=0
+changed=""
+for p in 1 2 3 4; do
+  before=$(printf '%s\n' $pk_before | sed -n "s/^p$p=//p")
+  after=$(printf '%s\n' $pk_after | sed -n "s/^p$p=//p")
+  [ "${#before}" -eq 64 ] || continue
+  [ "$after" = unread ] && continue
+  compared=$((compared + 1))
+  [ "$after" = "$before" ] || changed="$changed p$p"
+done
+echo "public key digests before: $pk_before"
+echo "public key digests after:  $pk_after"
+if [ "$compared" -gt 0 ]; then
+  unchanged=true
+  [ -n "$changed" ] && unchanged=false
+  details="{$inputs,\"parties_compared\":$compared,\"changed\":\"${changed# }\",\"before\":\"${pk_before% }\",\"after\":\"${pk_after% }\"}"
+  assert_always "$MSG_RESHARE_PUBLIC_KEY" "$unchanged" "$details"
+  if [ "$outcome" = failed ]; then
+    assert_sometimes "$MSG_RESHARE_PUBLIC_KEY_FAILED" "$unchanged" "$details"
+  fi
+  [ "$unchanged" = true ] || exit_code=1
+else
+  echo "could not read any party's public key both before and after; no public key check"
 fi
 
-# Any other failure is a reshare that did not finish everywhere: a core was down, slow or cut
-# off, or it rejected the request. The CLI reports a failed reshare as a panic, and the gRPC
-# status carries only the code. The epoch is kept, because the other cores can complete it.
-record_epoch "$new_epoch" "$key_id" unconfirmed
-err=$(grep -m 1 -A 2 'panicked at' cli.out || tail -n 3 cli.out)
-assert_reachable "$MSG_RESHARE_NO_VERDICT" "{$inputs,\"error\":\"$(json_str "$err")\"}"
-tail -n 20 cli.out
-exit 0
+# Source epoch: one public decryption of a fresh value under it, up to 2 attempts.
+data_type=$(pick ebool euint8 euint16 euint32 euint64 euint128)
+value=$(pick_value "$data_type")
+left_out=none
+attempt=0
+while [ "$attempt" -lt 2 ]; do
+  attempt=$((attempt + 1))
+  write_client_config "$left_out"
+  set -- -l -f config.toml --max-iter 120 public-decrypt from-args --to-encrypt "0x$value" \
+    --data-type "$data_type" --key-id "$key_id"
+  [ "$source_epoch" != "$DEFAULT_EPOCH_ID" ] &&
+    set -- "$@" --context-id "$DEFAULT_CONTEXT_ID" --epoch-id "$source_epoch"
+  [ "$(pick async async sync)" = sync ] && set -- "$@" --sync
+  echo "source epoch check, attempt $attempt/2: kms-core-client $*"
+  timeout 300 kms-core-client "$@" >decrypt.out 2>&1
+  drc=$?
+  details="{$inputs,\"check_data_type\":\"$data_type\",\"check_value_hex\":\"$value\",\"check_left_out\":\"$left_out\",\"check_attempt\":$attempt,\"check_exit_code\":$drc"
+  if [ "$drc" -eq 0 ]; then
+    details="$details,\"request_id\":\"$(request_id_from decrypt.out)\"}"
+    assert_always "$MSG_RESHARE_SOURCE_PLAINTEXT" true "$details"
+    [ "$outcome" = failed ] && assert_sometimes "$MSG_RESHARE_SOURCE_AFTER_FAIL" true "$details"
+    break
+  fi
+  if err=$(public_decrypt_wrong_result decrypt.out); then
+    assert_always "$MSG_RESHARE_SOURCE_PLAINTEXT" false "$details,\"error\":\"$(json_str "$err")\"}"
+    cat decrypt.out
+    exit 1
+  fi
+  if [ "$drc" -eq 2 ]; then
+    echo "kms-core-client rejected the arguments"
+    cat decrypt.out
+    exit 1
+  fi
+  # No verdict, which faults allow. A response that fails authentication never comes from a
+  # correct party; the decryption driver asserts on that, here it is only logged.
+  public_decrypt_unauthenticated decrypt.out
+  [ "$outcome" = failed ] &&
+    assert_sometimes "$MSG_RESHARE_SOURCE_AFTER_FAIL" false "$details,\"error\":\"$(json_str "$(tail -n 2 decrypt.out)")\"}"
+  tail -n 3 decrypt.out | cut -c 1-400
+  if ! cli_connected decrypt.out && unreached=$(cli_unreached_party decrypt.out); then
+    left_out=$unreached
+  fi
+  [ "$attempt" -lt 2 ] && sleep 10
+done
+exit "$exit_code"

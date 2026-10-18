@@ -1,0 +1,29 @@
+Building config image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/snouty-config:20261018-055937-434f
+Pushing config image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/snouty-config:20261018-055937-434f
+Config image pushed successfully: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/snouty-config@sha256:137c9a157e4a39dd3e1cb6b9a454d4b1e414e7f648ff07ac80cbb096ed34bf35
+
+Requesting Antithesis test run with params:
+{
+  "antithesis.test_name": "speedrun/zama-kms/kms@3095d82a",
+  "antithesis.description": "speedrun hunt current #3: level 3 plus timing fuzzing (custom.timing_fuzzing=true), 105 m, turbo: new timing regimes for races",
+  "antithesis.duration": "105",
+  "antithesis.source": "speedrun",
+  "antithesis.config_image": "snouty-config@sha256:137c9a157e4a39dd3e1cb6b9a454d4b1e414e7f648ff07ac80cbb096ed34bf35",
+  "attrs.tool": "speedrun",
+  "attrs.customer": "zama-kms",
+  "attrs.system": "kms",
+  "attrs.purpose": "hunt",
+  "attrs.build": "current",
+  "attrs.ref": "3095d82a",
+  "antithesis.performance_tier": "turbo",
+  "custom.enabled_faults": "network,pod_stop,pod_kill,clock_jitter",
+  "custom.timing_fuzzing": "true",
+  "custom.container_faults_stop_exclusion_patterns": "^kms-core-client,^minio-",
+  "custom.container_faults_kill_exclusion_patterns": "^kms-core-client,^minio-",
+  "vcs.repo_branch": "antithesis-poc-speedrun",
+  "vcs.version_id": "3095d82afc277661a2d1629f8d31cc91bf4761f0",
+  "run.caller_type": "snouty"
+}
+{
+  "runId": "4e338bff64a6f329ebadc856cace0692-64-4"
+}

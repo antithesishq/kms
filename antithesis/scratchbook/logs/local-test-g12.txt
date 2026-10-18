@@ -1,0 +1,91 @@
+pod/kms-core-client-0 condition met
+
+=== first_generate_key.sh ===
+attempt 1: kms-core-client insecure-preproc-key-gen, then insecure-key-gen
+generated key e73fb373dddf40ca11dcb2d564ece942c2e1fc957a5081cef4cccb60672e0df0 (preproc cdeccebfe61cf6cffaa22c7f07f4d548ce38e883fc062b33e901d49faadcaf68)
+[assert] Reachable "workload generated an FHE key"
+
+=== parallel_driver_public_decrypt.sh ===
+attempt 1/3: kms-core-client -l -f config.toml --max-iter 120 public-decrypt from-args --to-encrypt 0xd14df944 --data-type euint32 --key-id e73fb373dddf40ca11dcb2d564ece942c2e1fc957a5081cef4cccb60672e0df0 --batch-size 1 --sync --no-precompute-sns
+[assert] Always "public decryption response carries the encrypted plaintext": true
+[assert] Reachable "public decryption succeeded through three of the four cores"
+[assert] Reachable "public decryption succeeded through the sync endpoint"
+[assert] Reachable "public decryption succeeded with SnS left to the cores"
+public decryption: ok=true after 1 attempt(s), 0 without a verdict
+
+=== parallel_driver_public_decrypt.sh ===
+attempt 1/3: kms-core-client -l -f config.toml --max-iter 120 public-decrypt from-args --to-encrypt 0x0100 --data-type euint16 --key-id e73fb373dddf40ca11dcb2d564ece942c2e1fc957a5081cef4cccb60672e0df0 --batch-size 1 --sync
+[assert] Always "public decryption response carries the encrypted plaintext": true
+[assert] Reachable "public decryption succeeded through the sync endpoint"
+public decryption: ok=true after 1 attempt(s), 0 without a verdict
+
+=== parallel_driver_public_decrypt.sh ===
+attempt 1/3: kms-core-client -l -f config.toml --max-iter 120 -a public-decrypt from-args --to-encrypt 0xffffffff --data-type euint32 --key-id bca4474f544877be2697a977cef769a33e8b23941b3390bce8b4208f458edbba --batch-size 1 --sync
+[assert] Always "public decryption response carries the encrypted plaintext": true
+[assert] Reachable "public decryption succeeded with every party's response checked"
+[assert] Reachable "public decryption succeeded through the sync endpoint"
+public decryption: ok=true after 1 attempt(s), 0 without a verdict
+
+=== parallel_driver_public_decrypt.sh ===
+attempt 1/1: kms-core-client -l -f config.toml --max-iter 120 -a public-decrypt from-args --to-encrypt 0xe8999fb2d225148edcfb6cf68228c0f6de725a88 --data-type euint160 --key-id e73fb373dddf40ca11dcb2d564ece942c2e1fc957a5081cef4cccb60672e0df0 --batch-size 3 --sync
+[assert] Always "public decryption response carries the encrypted plaintext": true
+[assert] Reachable "public decryption succeeded with every party's response checked"
+[assert] Reachable "public decryption succeeded through the sync endpoint"
+[assert] Reachable "batched public decryption succeeded"
+public decryption: ok=true after 1 attempt(s), 0 without a verdict
+
+=== anytime_reshare_key.sh ===
+kms-core-client -f config.toml --max-iter 1200 new-epoch --new-epoch-id 08feede019bb8e6a519d8af19ad51ebd76607662a3f1bffccab87ddfae78cd45 --new-context-id 0700000000000000000000000000000000000000000000000000000000000001 --previous-epoch-params context_id:0700000000000000000000000000000000000000000000000000000000000001;epoch_id:0800000000000000000000000000000000000000000000000000000000000001;previous_keys:[key_id=e73fb373dddf40ca11dcb2d564ece942c2e1fc957a5081cef4cccb60672e0df0,preproc_id=cdeccebfe61cf6cffaa22c7f07f4d548ce38e883fc062b33e901d49faadcaf68,xof_key_digest=3567166deabec3d7dbaa99d42d5aaaae57e3a8e05ffe0dcb2260082f0a5a4a8d,public_key_digest=f972f7a44725eb035e47df363d2a7580b34e14ee43dd0fda8ee9f4744f7d7e98]
+[assert] Always "key reshare result from every KMS party matches the reshared key": true
+
+=== parallel_driver_public_decrypt.sh ===
+attempt 1/1: kms-core-client -l -f config.toml --max-iter 120 -a public-decrypt from-args --to-encrypt 0x00000000 --data-type euint32 --key-id e73fb373dddf40ca11dcb2d564ece942c2e1fc957a5081cef4cccb60672e0df0 --batch-size 3 --sync
+[assert] Always "public decryption response carries the encrypted plaintext": true
+[assert] Reachable "public decryption succeeded with every party's response checked"
+[assert] Reachable "public decryption succeeded through the sync endpoint"
+[assert] Reachable "batched public decryption succeeded"
+public decryption: ok=true after 1 attempt(s), 0 without a verdict
+
+=== parallel_driver_public_decrypt.sh ===
+attempt 1/3: kms-core-client -l -f config.toml --max-iter 120 public-decrypt from-args --to-encrypt 0x01 --data-type ebool --key-id e73fb373dddf40ca11dcb2d564ece942c2e1fc957a5081cef4cccb60672e0df0 --batch-size 1 --context-id 0700000000000000000000000000000000000000000000000000000000000001 --epoch-id 08feede019bb8e6a519d8af19ad51ebd76607662a3f1bffccab87ddfae78cd45 --sync --no-precompute-sns
+[assert] Always "public decryption response carries the encrypted plaintext": true
+[assert] Reachable "public decryption succeeded through three of the four cores"
+[assert] Reachable "public decryption succeeded through the sync endpoint"
+[assert] Reachable "public decryption succeeded with SnS left to the cores"
+[assert] Reachable "public decryption succeeded under a reshared epoch"
+public decryption: ok=true after 1 attempt(s), 0 without a verdict
+
+=== parallel_driver_public_decrypt.sh ===
+attempt 1/2: kms-core-client -l -f config.toml --max-iter 120 -a public-decrypt from-args --to-encrypt 0xffffffffffffffff --data-type euint64 --key-id e73fb373dddf40ca11dcb2d564ece942c2e1fc957a5081cef4cccb60672e0df0 --batch-size 1 --context-id 0700000000000000000000000000000000000000000000000000000000000001 --epoch-id 08feede019bb8e6a519d8af19ad51ebd76607662a3f1bffccab87ddfae78cd45 --sync
+[assert] Always "public decryption response carries the encrypted plaintext": true
+[assert] Reachable "public decryption succeeded with every party's response checked"
+[assert] Reachable "public decryption succeeded through the sync endpoint"
+[assert] Reachable "public decryption succeeded under a reshared epoch"
+public decryption: ok=true after 1 attempt(s), 0 without a verdict
+
+=== parallel_driver_public_decrypt.sh ===
+attempt 1/3: kms-core-client -l -f config.toml --max-iter 120 public-decrypt from-args --to-encrypt 0x01000000000000000000000000000000 --data-type euint128 --key-id e73fb373dddf40ca11dcb2d564ece942c2e1fc957a5081cef4cccb60672e0df0 --batch-size 1 --context-id 0700000000000000000000000000000000000000000000000000000000000001 --epoch-id 08feede019bb8e6a519d8af19ad51ebd76607662a3f1bffccab87ddfae78cd45 --sync
+[assert] Always "public decryption response carries the encrypted plaintext": true
+[assert] Reachable "public decryption succeeded through three of the four cores"
+[assert] Reachable "public decryption succeeded through the sync endpoint"
+[assert] Reachable "public decryption succeeded under a reshared epoch"
+public decryption: ok=true after 1 attempt(s), 0 without a verdict
+
+=== eventually_recovers_after_faults.sh ===
+attempt 1 at +0 s (limit 90 s): kms-core-client -l -f config.toml --max-iter 60 -a public-decrypt from-args --to-encrypt 0x0000000000000000000000000000000000000000000000000000000000000080 --data-type euint256 --key-id e73fb373dddf40ca11dcb2d564ece942c2e1fc957a5081cef4cccb60672e0df0 --batch-size 2
+[assert] Always "public decryption response carries the encrypted plaintext": true
+[assert] Always "every core accepts client connections within 600 s after faults stop": true
+[assert] Always "public decryption answered by all four cores succeeds within 300 s of every core accepting connections": true
+recovery: all cores accepted connections after 0 s; decryption ok=true after 1 attempt(s)
+
+All test commands exited 0.
+
+# Hard paths, run by hand on local k3s (core 3 scaled to 0 by the operator for this check only):
+# parallel_driver_public_decrypt.sh with three_core_pct=0: attempt 1 (-a, four cores) could not
+#   connect to party 3; attempt 2 left party 3 out and succeeded. Sometimes "succeeded on a retry
+#   after an attempt without a verdict" and "succeeded after the client left out a core it could
+#   not connect to" both true; Always plaintext true. A run with max_attempts=1 ended ok=false, exit 0.
+# eventually_recovers_after_faults.sh with core 3 scaled back to 1 after 25 s: attempts 1-4 could
+#   not connect to party 3; attempt 5 (+46 s) connected and succeeded. Both Always true, both
+#   Sometimes true, exit 0. All sdk.jsonl lines parsed as JSON; every evaluation had guarantee and
+#   property in its details. Deployment then removed with make down.

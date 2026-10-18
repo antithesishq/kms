@@ -1,0 +1,191 @@
+diff --git a/core/service/src/engine/backup_operator.rs b/core/service/src/engine/backup_operator.rs
+--- a/core/service/src/engine/backup_operator.rs
++++ b/core/service/src/engine/backup_operator.rs
+@@ -847,6 +847,11 @@
+ /// A node whose private storage holds its signing identity boots under it. A node that lost it
+ /// boots in recovery mode, where only custodian backup recovery is possible, under the key
+ /// [`recovery_mode_verf_key`] picks from `public_storage` or `backup_vault`.
++///
++/// A node has lost its signing key only when private storage lists none. When the key is there
++/// but cannot be read, or private storage cannot be listed at all (for example while it is
++/// briefly unreachable), the boot fails instead, so that it is retried: a node in recovery mode
++/// cannot sign anything until it is restarted.
+ pub async fn boot_base_kms<PrivS: StorageReader, PubS: StorageReader>(
+     kms_type: KMSType,
+     private_storage: &PrivS,
+@@ -858,6 +863,21 @@
+         Ok(identity) => Ok(BaseKmsStruct::new(kms_type, identity, rng_source)),
+         Err(e) => {
+             tracing::warn!("Error loading signing key: {e:?}");
++            let stored_keys = private_storage
++                .all_data_ids(&PrivDataType::SigningKey.to_string())
++                .await
++                .map_err(|list_err| {
++                    anyhow::anyhow!(
++                        "Could not load the signing key ({e}) nor list the signing keys in \
++                         private storage ({list_err}); not entering recovery mode"
++                    )
++                })?;
++            if !stored_keys.is_empty() {
++                return Err(e.context(
++                    "Private storage holds a signing key that could not be loaded; not entering \
++                     recovery mode",
++                ));
++            }
+             tracing::warn!(
+                 "SIGNING KEY NOT AVAILABLE, ENTERING RECOVERY MODE!!!!\nOnly backup recovery operations should be done and TLS must not be available!\n
+                 Make sure to use a configuration file without TLS configured and\n
+@@ -1592,7 +1612,7 @@
+     use crate::consts::{DEFAULT_MPC_CONTEXT, SIGNING_KEY_ID};
+     use crate::engine::rng_source::test_rng_source;
+     use crate::vault::storage::{
+-        StorageProxy,
++        RootEntries, StorageProxy,
+         ram::RamStorage,
+         tests::{TestType, store_dummy_recovery_material},
+     };
+@@ -1614,11 +1634,13 @@
+     use kms_grpc::kms::v1::{CustodianContext, CustodianSetupMessage, OperatorBackupOutput};
+     use rand::SeedableRng;
+     use rand_chacha::ChaCha20Rng;
++    use serde::de::DeserializeOwned;
+     use std::{
+         collections::{BTreeMap, HashSet},
+         time::SystemTime,
+     };
+     use strum::IntoEnumIterator;
++    use tfhe::{Unversionize, named::Named};
+     use threshold_types::rng::AesRng;
+ 
+     /// Every backed-up private data type is restored exactly once, epoch data before the keysets
+@@ -1882,6 +1904,130 @@
+         );
+     }
+ 
++    /// Private storage that holds what `inner` holds but cannot read it back, as S3 storage
++    /// behaves while the network to it is down. Every read fails, and with `fail_listing` every
++    /// listing and existence check fails too.
++    struct UnreadableStorage {
++        inner: RamStorage,
++        fail_listing: bool,
++    }
++
++    impl StorageReader for UnreadableStorage {
++        async fn data_exists(&self, data_id: &RequestId, data_type: &str) -> anyhow::Result<bool> {
++            if self.fail_listing {
++                anyhow::bail!("dispatch failure");
++            }
++            self.inner.data_exists(data_id, data_type).await
++        }
++
++        async fn read_data<T: DeserializeOwned + Unversionize + Named + Send>(
++            &self,
++            _data_id: &RequestId,
++            _data_type: &str,
++        ) -> anyhow::Result<T> {
++            anyhow::bail!("dispatch failure")
++        }
++
++        async fn load_bytes(
++            &self,
++            _data_id: &RequestId,
++            _data_type: &str,
++        ) -> anyhow::Result<Vec<u8>> {
++            anyhow::bail!("dispatch failure")
++        }
++
++        async fn all_data_ids(&self, data_type: &str) -> anyhow::Result<HashSet<RequestId>> {
++            if self.fail_listing {
++                anyhow::bail!("dispatch failure");
++            }
++            self.inner.all_data_ids(data_type).await
++        }
++
++        async fn all_data_types(&self) -> anyhow::Result<RootEntries> {
++            if self.fail_listing {
++                anyhow::bail!("dispatch failure");
++            }
++            self.inner.all_data_types().await
++        }
++
++        fn info(&self) -> String {
++            "UnreadableStorage".to_string()
++        }
++    }
++
++    /// A node whose signing key is in private storage but cannot be read at boot, because the
++    /// read of the key or the listing that finds it fails, has not lost its key. It must not boot
++    /// in recovery mode, where it would refuse to sign until restarted, even though public storage
++    /// holds a key to boot under. The boot fails, and once storage answers again the retried boot
++    /// runs under the node's signing key.
++    #[tokio::test]
++    async fn boot_base_kms_does_not_enter_recovery_mode_when_the_signing_key_is_unreadable() {
++        let mut rng = AesRng::seed_from_u64(0);
++        let seed = RootSigningSeed::random(&mut rng);
++        let sk = seed.derive_ecdsa_signing_key().unwrap();
++        let mut private_storage = RamStorage::new();
++        store_versioned_at_request_id(
++            &mut private_storage,
++            &SIGNING_KEY_ID,
++            &seed,
++            &PrivDataType::SigningSeed.to_string(),
++        )
++        .await
++        .unwrap();
++        store_versioned_at_request_id(
++            &mut private_storage,
++            &SIGNING_KEY_ID,
++            &sk,
++            &PrivDataType::SigningKey.to_string(),
++        )
++        .await
++        .unwrap();
++        let verf_key = PublicSigKey::from_sk(&sk);
++        let mut public_storage = RamStorage::new();
++        store_versioned_at_request_id(
++            &mut public_storage,
++            &SIGNING_KEY_ID,
++            &verf_key,
++            &PubDataType::VerfKey.to_string(),
++        )
++        .await
++        .unwrap();
++
++        for fail_listing in [false, true] {
++            let unreadable = UnreadableStorage {
++                inner: private_storage.clone(),
++                fail_listing,
++            };
++            assert!(
++                boot_base_kms(
++                    KMSType::Threshold,
++                    &unreadable,
++                    &public_storage,
++                    None,
++                    test_rng_source(),
++                )
++                .await
++                .is_err(),
++                "a node whose signing key could not be read must not boot in recovery mode \
++                 (listing fails: {fail_listing})"
++            );
++        }
++
++        let base_kms = boot_base_kms(
++            KMSType::Threshold,
++            &private_storage,
++            &public_storage,
++            None,
++            test_rng_source(),
++        )
++        .await
++        .unwrap();
++        let identity = base_kms
++            .signing_identity()
++            .expect("once storage answers, the node must boot under its signing key");
++        assert_eq!(identity.verf_key(), verf_key);
++    }
++
+     /// A node that lost its public storage takes its backup key set from the recovery material.
+     /// An empty vault names no key set, and contexts that agree name theirs. The material must name
+     /// exactly one key set, because agreement on the ECDSA key alone is not enough. Material whose

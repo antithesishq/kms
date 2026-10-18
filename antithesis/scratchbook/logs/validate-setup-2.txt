@@ -1,0 +1,21 @@
+Running k8s-validator against manifests in antithesis/build/config-setup2/manifests...
+### 1. Schema Validation (kubeconform) ###
+Summary: 26 resources found in 10 files - Valid: 26, Invalid: 0, Errors: 0, Skipped: 0
+
+----------------------------------------------------------
+### 2. Deprecated API Checks (pluto) ###
+There were no resources found with known deprecated apiVersions.
+
+----------------------------------------------------------
+### 3. Custom Policy Checks (conftest) ###
+
+[33m884 tests, 880 passed, 4 warnings, 0 failures, 0 exceptions[0m
+[33mWARN[0m - /manifests/11-minio-provision-job.yaml - main - [1;33mMissing ReadinessProbe:[0m Job 'minio-provision' container 'mc' missing readinessProbe. readinessProbes are recommended for better pod lifecycle management and readiness detection
+[33mWARN[0m - /manifests/20-kms-prepopulate-keys-job.yaml - main - [1;33mMissing ReadinessProbe:[0m Job 'kms-prepopulate-keys' container 'gen-keys' missing readinessProbe. readinessProbes are recommended for better pod lifecycle management and readiness detection
+[33mWARN[0m - /manifests/40-kms-core-init.yaml - main - [1;33mMissing ReadinessProbe:[0m Job 'kms-core-init-threshold-init' container 'threshold-init' missing readinessProbe. readinessProbes are recommended for better pod lifecycle management and readiness detection
+[33mWARN[0m - /manifests/40-kms-core-init.yaml - main - [1;33mMissing ReadinessProbe:[0m StatefulSet 'kms-core-client' container 'kms-core-client' missing readinessProbe. readinessProbes are recommended for better pod lifecycle management and readiness detection
+
+----------------------------------------------------------
+
+[1m[92m👉 For more information on these policies, please see ]8;;https://antithesis.com/docs/best_practices/k8s_best_practices\Kubernetes Best Practices Docs]8;;\ [0m
+k8s manifests valid.

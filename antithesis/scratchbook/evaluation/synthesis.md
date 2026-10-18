@@ -1,7 +1,8 @@
 ---
-sut_path: /home/avpai/src/customer/customer-zama/sut/kms
-commit: 4a644c8546abc8b002b7e45c19bf195996e7d229  # plus the uncommitted Antithesis kit changes (sut/kms-changes.patch)
-updated: 2026-10-14
+sut_path: /home/exedev/kms
+commit: 4a644c8546abc8b002b7e45c19bf195996e7d229
+harness_commit: 3095d82afc277661a2d1629f8d31cc91bf4761f0
+updated: 2026-10-17
 external_references: []
 ---
 
@@ -66,8 +67,20 @@ these issues. All of them have been applied.
 |---|---|---|---|
 | 7 | Refinement (high) | Reusing a request ID with new ciphertexts gives a false positive. The core assumes a known ID carries the same ciphertexts, and `PublicDecryptSync` attaches to the old entry and returns the old plaintexts (`ARCHITECTURE.md:50`) | **Applied:** the Invariant, the Angle and the sketch now require a byte-identical resend with the original expected plaintexts |
 | 8 | Refinement | Gating on full request-bound validation hides mix-ups between requests | **Applied:** the gate is now the payload signature only, and `payload.request_id` is checked explicitly (`kms.v1.proto:407-421`) |
-| 9 | Gap (open question) | Epoch orphaning after a restart (`Antithesis_RUN/README.md:113-115`) could make node faults disable cores permanently and leave the `Always` unreached | **Added** as an untagged open question to the catalog, the evidence file and the deployment topology. Not investigated |
+| 9 | Gap (open question) | Epoch orphaning after a restart (claimed by an earlier deployment kit's README, not in this repo) could make node faults disable cores permanently and leave the `Always` unreached | **Added** as an open question; a later code trace found no such path (`partial`, see the evidence file) |
 | 10 | Refinement | Doc claims stated as fact, citation drift, `ebool` cannot give distinct values, and the "no false positive" result depends on `Test` params | **Applied** across sut-analysis, deployment-topology and the evidence file |
+
+## Extension to five guarantees (2026-10-17)
+
+The speedrun extended the catalog from one property to one per guarantee in
+[guarantees.md](../guarantees.md): [recovers-after-faults](../properties/recovers-after-faults.md),
+[reshare-preserves-key](../properties/reshare-preserves-key.md),
+[user-decrypt-returns-encrypted-plaintext](../properties/user-decrypt-returns-encrypted-plaintext.md)
+and [decrypt-request-id-retries](../properties/decrypt-request-id-retries.md). That closes gaps 4 and
+5 above. No lens pass was rerun for them; the main implementability findings are in their evidence
+files: the CLI connects to every core before sending, can't choose a request ID, and reports every
+reshare failure as a panic; and Guarantee 2's 300 s window needs to be measured from the cores
+accepting connections, with a separate 600 s bound.
 
 ## Open Questions
 

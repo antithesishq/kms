@@ -1,0 +1,117 @@
+{
+  "completed_at": "2026-10-18T09:09:19Z",
+  "created_at": "2026-10-18T06:54:10Z",
+  "creator": {
+    "name": "zama",
+    "type": "snouty"
+  },
+  "description": "speedrun fix-verify fixverify-decryption-stalls-after-core-restart #1: blinded patch for decryption-stalls-after-core-restart on the pre-fix build; level 3 like hunt-prefix-1, 120 m, turbo",
+  "launcher": "Advanced Kubernetes test",
+  "links": {
+    "triage_report": "https://zama.antithesis.com/report/E3aRgfAZx0FG9ubZyK2gLIoR/WOfMjnEReqZRagmPUuWwUHPDAjmwjhtZw3u5U5iRSuU.html?auth=v2.public.eyJuYmYiOiIyMDI2LTEwLTE4VDA4OjA5OjE5LjE3MjY0NjYxM1oiLCJzY29wZSI6eyJSZXBvcnRTY29wZVYxIjp7ImFzc2V0IjoiV09mTWpuRVJlcVpSYWdtUFV1V3dVSFBEQWptd2podFp3M3U1VTVpUlN1VS5odG1sIiwicmVwb3J0X2lkIjoiRTNhUmdmQVp4MEZHOXViWnlLMmdMSW9SIn19feJnQdPR6ASOY1JTnB5-6WNI3-5xqJfWurzelFpKrcEWWRqdnjJ2gCtotLkMWQ5e1aqAmMFoC5nDcB466sYCTwU"
+  },
+  "parameters": {
+    "antithesis.config_image": "snouty-config@sha256:6164c8147ab68a26936a695cdba35bfc53e95c61315bf7aa277ef2fa2b25f44f",
+    "antithesis.description": "speedrun fix-verify fixverify-decryption-stalls-after-core-restart #1: blinded patch for decryption-stalls-after-core-restart on the pre-fix build; level 3 like hunt-prefix-1, 120 m, turbo",
+    "antithesis.duration": "120",
+    "antithesis.is_ephemeral": "false",
+    "antithesis.performance_tier": "turbo",
+    "antithesis.source": "speedrun",
+    "attrs.ref": "3095d82a-fix-decryption-stalls",
+    "custom.strobe_chaos_seconds": "60",
+    "antithesis.integrations.type": "none",
+    "antithesis.test_name": "speedrun/zama-kms/kms@3095d82a-fix-decryption-stalls",
+    "custom.smoke_test_seconds": "100",
+    "vcs.version_id": "3095d82afc277661a2d1629f8d31cc91bf4761f0",
+    "attrs.system": "kms",
+    "custom.container_faults_kill_exclusion_patterns": "^kms-core-client,^minio-",
+    "custom.strobe_quiet_min_seconds": "20",
+    "attrs.customer": "zama-kms",
+    "custom.strobe_quiet_max_seconds": "0",
+    "attrs.tool": "speedrun",
+    "attrs.build": "fixverify-decryption-stalls-after-core-restart",
+    "attrs.purpose": "fix-verify",
+    "custom.enabled_faults": "network,pod_stop,pod_kill,clock_jitter",
+    "custom.pause_fault_injector": "false",
+    "custom.timing_fuzzing": "false",
+    "custom.vm_memory_mb": "0",
+    "vcs.repo_branch": "antithesis-poc-speedrun",
+    "run.caller_type": "snouty",
+    "custom.manifests_path": "/opt/config/manifests",
+    "antithesis.is_setup": "false",
+    "custom.container_faults_stop_exclusion_patterns": "^kms-core-client,^minio-",
+    "custom.post_setup_settle_seconds": "100",
+    "custom.pod_fault_interval_seconds": "300"
+  },
+  "results": {
+    "environment": {
+      "antithesis_version": "v64-4",
+      "images": [
+        {
+          "name": "snouty-config",
+          "image": "us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/snouty-config@sha256:7c1cb4d98ce0f0ebe95cce9448ead9416e8a44fd3aa006cf76747440ae81a918",
+          "created": "2026-10-18T06:52:55.518671679Z"
+        },
+        {
+          "name": "mirrored-coredns-coredns",
+          "image": "docker.io/rancher/mirrored-coredns-coredns@sha256:884b72dd6d2f7d367902af420605e0288dffedb0516ce29330423ae3f8f5c6fa",
+          "created": "2026-04-22T12:43:42.180783644Z"
+        },
+        {
+          "name": "mc-mirror",
+          "image": "docker.io/scnd/mc-mirror@sha256:8d62e7ce5ee3a5320cc2c5eca36b781340aff30da14b8f9057cc0f9efeaec031",
+          "tag": "RELEASE.2025-02-04T04-57-50Z",
+          "created": "2025-02-04T06:46:14.407252166Z"
+        },
+        {
+          "name": "minio-mirror",
+          "image": "docker.io/scnd/minio-mirror@sha256:52dfd5c0bbd38d3219f2058c7af216d9f9a27a994b7b5baad09bbd38866015ff",
+          "tag": "RELEASE.2025-09-07T16-13-09Z",
+          "created": "2025-09-07T18:42:37.017942402Z"
+        },
+        {
+          "name": "local-path-provisioner",
+          "image": "docker.io/rancher/local-path-provisioner@sha256:67f83d34746a637da2141ae38ab547a1d7edc440e794c42239c0fb908296bdfc",
+          "created": "2026-05-08T17:32:52.406867067Z"
+        },
+        {
+          "name": "busybox",
+          "image": "docker.io/library/busybox@sha256:6be969a074d06073a62ad8ccfd2ad6ec2790cae25d519d8df255ba24819d96f0",
+          "created": "2024-09-26T21:31:42Z"
+        },
+        {
+          "name": "mirrored-pause",
+          "image": "docker.io/rancher/mirrored-pause@sha256:7c38f24774e3cbd906d2d33c38354ccf787635581c122965132c9bd309754d4a",
+          "created": "2024-05-23T20:42:04.96991089Z"
+        },
+        {
+          "name": "core-client",
+          "image": "us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-client@sha256:1b092bdb4219207432548397c2619b96c3dce1238e6575cf07cbab3a8c5e2630",
+          "tag": "speedrun-3095d82a-fix-decryption-stalls",
+          "created": "2026-10-18T06:50:46.015327342Z"
+        },
+        {
+          "name": "core-service-probe",
+          "image": "us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-service-probe@sha256:29f86c9be3af997dfc877785000be5fb1294798a511d6a9057cf5253905aec80",
+          "tag": "speedrun-3095d82a-fix-decryption-stalls",
+          "created": "2026-10-18T06:50:44.845300933Z"
+        },
+        {
+          "name": "core-service",
+          "image": "us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-service@sha256:05c36e9b9a90878341d6355c6ea51c13f0fd6216813e29c92ee14014c6ec9780",
+          "tag": "speedrun-3095d82a-fix-decryption-stalls",
+          "created": "2026-10-18T06:50:43.622747995Z"
+        },
+        {
+          "name": "init-envsubst",
+          "image": "us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/init-envsubst@sha256:f842744f94c063b56951c2f02cd7f389ee0611beec9283a0fdc3941f807c41f7",
+          "tag": "speedrun-3095d82a-fix-decryption-stalls",
+          "created": "2026-10-18T06:50:51.315959457Z"
+        }
+      ]
+    }
+  },
+  "run_id": "a7167532671d016c1683aa3df1145e45-64-4",
+  "started_at": "2026-10-18T06:54:10Z",
+  "status": "completed"
+}

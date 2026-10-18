@@ -1,0 +1,62 @@
+make: Entering directory '/home/exedev/kms/antithesis'
+/home/exedev/kms/antithesis/config/render.sh
+Rendered /home/exedev/kms/antithesis/build/config with tag speedrun-3095d82a
+/home/exedev/kms/antithesis/local/load.sh
+Importing into k3s:
+  docker.io/scnd/mc-mirror:RELEASE.2025-02-04T04-57-50Z
+  docker.io/scnd/minio-mirror:RELEASE.2025-09-07T16-13-09Z
+  us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-client:speedrun-3095d82a
+  us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-service-probe:speedrun-3095d82a
+  us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-service:speedrun-3095d82a
+  us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/init-envsubst:speedrun-3095d82a
+docker.io/scnd/mc mirror:RELEASE.2025 02	saved	
+application/vnd.docker.distribution.manifest.v2+json sha256:8d62e7ce5ee3a5320cc2c5eca36b781340aff30da14b8f9057cc0f9efeaec031
+Importing	elapsed: 62.5s	total:   0.0 B	(0.0 B/s)	
+docker.io/scnd/mc mirror:RELEASE.2025 02	saved	
+docker.io/scnd/minio mirror:RELEASE.2025	saved	
+application/vnd.docker.distribution.manifest.v2+json sha256:8d62e7ce5ee3a5320cc2c5eca36b781340aff30da14b8f9057cc0f9efeaec031
+application/vnd.docker.distribution.manifest.v2+json sha256:52dfd5c0bbd38d3219f2058c7af216d9f9a27a994b7b5baad09bbd38866015ff
+Importing	elapsed: 62.5s	total:   0.0 B	(0.0 B/s)	
+docker.io/scnd/mc mirror:RELEASE.2025 02	saved	
+docker.io/scnd/minio mirror:RELEASE.2025	saved	
+us central1 docker.pkg.dev/molten verve 	saved	
+application/vnd.docker.distribution.manifest.v2+json sha256:8d62e7ce5ee3a5320cc2c5eca36b781340aff30da14b8f9057cc0f9efeaec031
+application/vnd.docker.distribution.manifest.v2+json sha256:52dfd5c0bbd38d3219f2058c7af216d9f9a27a994b7b5baad09bbd38866015ff
+application/vnd.oci.image.index.v1+json sha256:c950422f2b0faf37a755ff28494221bbbfdb6c9f05155d5465e65236d16e21b7
+Importing	elapsed: 62.5s	total:   0.0 B	(0.0 B/s)	
+docker.io/scnd/mc mirror:RELEASE.2025 02	saved	
+docker.io/scnd/minio mirror:RELEASE.2025	saved	
+us central1 docker.pkg.dev/molten verve 	saved	
+us central1 docker.pkg.dev/molten verve 	saved	
+application/vnd.docker.distribution.manifest.v2+json sha256:8d62e7ce5ee3a5320cc2c5eca36b781340aff30da14b8f9057cc0f9efeaec031
+application/vnd.docker.distribution.manifest.v2+json sha256:52dfd5c0bbd38d3219f2058c7af216d9f9a27a994b7b5baad09bbd38866015ff
+application/vnd.oci.image.index.v1+json sha256:c950422f2b0faf37a755ff28494221bbbfdb6c9f05155d5465e65236d16e21b7
+application/vnd.oci.image.index.v1+json sha256:e23cb069ba48252c671dc319ed34c70436500209aa0d361872bd79233d751ccf
+Importing	elapsed: 62.5s	total:   0.0 B	(0.0 B/s)	
+docker.io/scnd/mc mirror:RELEASE.2025 02	saved	
+docker.io/scnd/minio mirror:RELEASE.2025	saved	
+us central1 docker.pkg.dev/molten verve 	saved	
+us central1 docker.pkg.dev/molten verve 	saved	
+us central1 docker.pkg.dev/molten verve 	saved	
+application/vnd.docker.distribution.manifest.v2+json sha256:8d62e7ce5ee3a5320cc2c5eca36b781340aff30da14b8f9057cc0f9efeaec031
+application/vnd.docker.distribution.manifest.v2+json sha256:52dfd5c0bbd38d3219f2058c7af216d9f9a27a994b7b5baad09bbd38866015ff
+application/vnd.oci.image.index.v1+json sha256:c950422f2b0faf37a755ff28494221bbbfdb6c9f05155d5465e65236d16e21b7
+application/vnd.oci.image.index.v1+json sha256:e23cb069ba48252c671dc319ed34c70436500209aa0d361872bd79233d751ccf
+application/vnd.oci.image.index.v1+json sha256:e2d90160c7cf60a5a73fdaf8cecd1a627f670362df29735e77d367b605b5bec3
+Importing	elapsed: 62.5s	total:   0.0 B	(0.0 B/s)	
+docker.io/scnd/mc mirror:RELEASE.2025 02	saved	
+docker.io/scnd/minio mirror:RELEASE.2025	saved	
+us central1 docker.pkg.dev/molten verve 	saved	
+us central1 docker.pkg.dev/molten verve 	saved	
+us central1 docker.pkg.dev/molten verve 	saved	
+us central1 docker.pkg.dev/molten verve 	saved	
+application/vnd.docker.distribution.manifest.v2+json sha256:8d62e7ce5ee3a5320cc2c5eca36b781340aff30da14b8f9057cc0f9efeaec031
+application/vnd.docker.distribution.manifest.v2+json sha256:52dfd5c0bbd38d3219f2058c7af216d9f9a27a994b7b5baad09bbd38866015ff
+application/vnd.oci.image.index.v1+json sha256:c950422f2b0faf37a755ff28494221bbbfdb6c9f05155d5465e65236d16e21b7
+application/vnd.oci.image.index.v1+json sha256:e23cb069ba48252c671dc319ed34c70436500209aa0d361872bd79233d751ccf
+application/vnd.oci.image.index.v1+json sha256:e2d90160c7cf60a5a73fdaf8cecd1a627f670362df29735e77d367b605b5bec3
+application/vnd.oci.image.index.v1+json sha256:b2f920fdb98d2b26f64f449758448a9055b63c12de4ec393778a815e39a7d6dd
+Importing	elapsed: 62.5s	total:   0.0 B	(0.0 B/s)	
+All 6 images are in k3s.
+make: Leaving directory '/home/exedev/kms/antithesis'
+exit 0

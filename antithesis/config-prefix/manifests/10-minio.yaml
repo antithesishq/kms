@@ -1,0 +1,97 @@
+# S3 backend for the KMS. The chart does not deploy MinIO itself.
+#
+# The DNS name `minio` is load-bearing: it is hardcoded in every core's aws.toml, in the
+# core-client config, and in both bootstrap Jobs.
+#
+# Minimized for Antithesis:
+#   - hostPath /var/lib/kms-minio-data -> PVC. A hostPath pins the pod to one node and
+#     its data deliberately outlives a namespace delete, so successive runs would not
+#     start from identical state. A PVC is namespace-scoped, so it is torn down with
+#     everything else, and it survives a pod restart -- which matters under fault
+#     injection: in production the vault is AWS S3, and "storage restarts and loses every
+#     object" has no production analogue. With the PVC a MinIO restart is a recoverable
+#     S3 blip, which is a realistic fault worth exercising.
+#   - console port 9001 dropped; nothing in the test opens a web UI.
+#   - resource requests added (the only long-running container that had none).
+#
+# Root credentials are placeholders. This is a test-only deployment.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: minio-data
+  namespace: kms-threshold-staging
+  annotations:
+    kapp.k14s.io/change-group: minio
+# storageClassName is deliberately unset, so the cluster default applies. Antithesis's
+# environment is single-node k3s with local-path-provisioner as the default, and a local
+# k3s matches. Pinning a class here would break one of the two.
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio
+  namespace: kms-threshold-staging
+  annotations:
+    kapp.k14s.io/change-group: minio
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minio
+  template:
+    metadata:
+      labels:
+        app: minio
+    spec:
+      containers:
+      - name: minio
+        image: docker.io/scnd/minio-mirror:RELEASE.2025-09-07T16-13-09Z
+        imagePullPolicy: Never
+        args: ["server", "/data"]
+        env:
+        - name: MINIO_ROOT_USER
+          value: minioadmin
+        - name: MINIO_ROOT_PASSWORD
+          value: minioadmin
+        ports:
+        - containerPort: 9000
+        # Requests count toward Antithesis's cluster-wide caps (1 CPU, 10 GiB); the
+        # running total with these is 550m CPU / 9.25 GiB. See working.md.
+        resources:
+          requests:
+            cpu: 50m
+            memory: 256Mi
+          limits:
+            memory: 1Gi
+        readinessProbe:
+          httpGet:
+            path: /minio/health/ready
+            port: 9000
+        volumeMounts:
+        - name: data
+          mountPath: /data
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: minio-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  namespace: kms-threshold-staging
+  annotations:
+    kapp.k14s.io/change-group: minio
+spec:
+  selector:
+    app: minio
+  ports:
+  - name: s3
+    port: 9000
+    targetPort: 9000

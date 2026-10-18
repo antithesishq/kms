@@ -1,0 +1,28 @@
+Building config image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/snouty-config:20261018-003008-5924
+Pushing config image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/snouty-config:20261018-003008-5924
+Config image pushed successfully: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/snouty-config@sha256:0d2e8e4b4ee82b63e1b9ec273b777aee12af768af4b131913ec7b04445a32166
+
+Requesting Antithesis test run with params:
+{
+  "antithesis.test_name": "speedrun/zama-kms/kms@3095d82a-prefix887",
+  "antithesis.description": "speedrun hunt prefix #1: default fault set (network, pod stop/kill, clock jumps), 4 h, turbo; first pre-fix hunt",
+  "antithesis.duration": "240",
+  "antithesis.source": "speedrun",
+  "antithesis.config_image": "snouty-config@sha256:0d2e8e4b4ee82b63e1b9ec273b777aee12af768af4b131913ec7b04445a32166",
+  "attrs.tool": "speedrun",
+  "attrs.customer": "zama-kms",
+  "attrs.system": "kms",
+  "attrs.purpose": "hunt",
+  "attrs.build": "prefix",
+  "attrs.ref": "3095d82a-prefix887",
+  "antithesis.performance_tier": "turbo",
+  "custom.enabled_faults": "network,pod_stop,pod_kill,clock_jitter",
+  "custom.container_faults_stop_exclusion_patterns": "^kms-core-client,^minio-",
+  "custom.container_faults_kill_exclusion_patterns": "^kms-core-client,^minio-",
+  "vcs.repo_branch": "antithesis-poc-speedrun",
+  "vcs.version_id": "3095d82afc277661a2d1629f8d31cc91bf4761f0",
+  "run.caller_type": "snouty"
+}
+{
+  "runId": "52a8bf9be7747728dac81893037062a5-64-4"
+}

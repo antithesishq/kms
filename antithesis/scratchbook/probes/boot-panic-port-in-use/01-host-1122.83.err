@@ -1,0 +1,4 @@
+Error: API error: 400 Bad Request — This run is not currently active or reachable. Unable to execute command.
+
+Note: `runs exec` needs a run that is in progress. This run is completed
+Suggestion: start a debugging session at this moment with `snouty debug --run-id 5a41ff4512a62b259c30d0cf245647d8-64-4 --input-hash -6620762927361152219 --vtime 1122.8279770489316`

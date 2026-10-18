@@ -1,0 +1,1024 @@
+=== speedrun build attempt 1 2026-10-18T06:18:18Z ===
+engine: docker
+tag: speedrun-3095d82a-fix-decryption-stalls
+kms source: /home/exedev/kms-fixverify
+rust toolchain: 1.98.1 (from rust-toolchain.toml)
+
+=== zama-golden: Zama's rust-golden-image (docker/base/Dockerfile) ===
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.53kB 0.0s done
+#1 DONE 0.1s
+
+#2 [context cgr.dev/zama.ai/glibc-dynamic:16-dev] load metadata for cgr.dev/chainguard/glibc-dynamic:latest-dev
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 372B done
+#3 DONE 0.0s
+
+#4 [context cgr.dev/zama.ai/glibc-dynamic:16-dev] cgr.dev/chainguard/glibc-dynamic:latest-dev
+#4 resolve cgr.dev/chainguard/glibc-dynamic:latest-dev
+#4 resolve cgr.dev/chainguard/glibc-dynamic:latest-dev 0.6s done
+#4 DONE 0.8s
+
+#4 [context cgr.dev/zama.ai/glibc-dynamic:16-dev] cgr.dev/chainguard/glibc-dynamic:latest-dev
+#4 sha256:66af599de3e2f9617fc4f44594e54957908188fc1a526a18ebb8a6860c75a150 0B / 39.12kB 0.2s
+#4 sha256:66af599de3e2f9617fc4f44594e54957908188fc1a526a18ebb8a6860c75a150 39.12kB / 39.12kB 0.2s done
+#4 sha256:909e4f3ea945194f6b6fb566ee74d0829e0522274b951d89f37fe05a9088d858 917.27kB / 917.27kB 0.2s done
+#4 extracting sha256:909e4f3ea945194f6b6fb566ee74d0829e0522274b951d89f37fe05a9088d858 0.1s done
+#4 extracting sha256:c2c6babb1dc5973c3ad52dbcfdbff9031fa1f7d01a70966e5648683c6182a917 0.0s done
+#4 DONE 1.1s
+
+#4 [context cgr.dev/zama.ai/glibc-dynamic:16-dev] cgr.dev/chainguard/glibc-dynamic:latest-dev
+#4 extracting sha256:85eb7d15b350170255f5f5cdc67b58a22cdb91fc5e08dcad864e48dc6a24e13d 0.1s done
+#4 DONE 1.3s
+
+#4 [context cgr.dev/zama.ai/glibc-dynamic:16-dev] cgr.dev/chainguard/glibc-dynamic:latest-dev
+#4 extracting sha256:66af599de3e2f9617fc4f44594e54957908188fc1a526a18ebb8a6860c75a150 0.1s done
+#4 DONE 1.3s
+
+#5 [prod 1/4] RUN --mount=type=cache,target=/var/cache/apk,sharing=locked     --mount=type=cache,target=/var/lib/apk,sharing=locked     apk add --no-cache     curl     wget     bash     git     make     perl     binutils     gcc     libstdc++     linux-headers     build-base     openssl-dev     protoc     protobuf
+#5 0.294 fetch https://apk.cgr.dev/chainguard/x86_64/APKINDEX.tar.gz
+#5 1.615 (1/28) Installing libzstd1 (1.5.7-r10)
+#5 1.836 (2/28) Installing binutils (2.47-r1)
+#5 2.514 (3/28) Installing libxcrypt-dev (4.5.2-r6)
+#5 2.653 (4/28) Installing linux-headers (7.2.11-r0)
+#5 2.912 (5/28) Installing glibc-2.44-dev (2.44-r8)
+#5 3.491 (6/28) Installing libquadmath (16.2.0-r1)
+#5 3.611 (7/28) Installing libstdc++-dev (16.2.0-r1)
+#5 4.151 (8/28) Installing openssf-compiler-options (20250904-r11)
+#5 4.290 (9/28) Installing posix-cc-wrappers (2-r10)
+#5 4.396 (10/28) Installing libatomic (16.2.0-r1)
+#5 4.547 (11/28) Installing gmp (6.3.0-r10)
+#5 4.672 (12/28) Installing libgomp (16.2.0-r1)
+#5 4.794 (13/28) Installing isl (0.28-r4)
+#5 4.922 (14/28) Installing mpfr (4.2.2-r3)
+#5 5.056 (15/28) Installing mpc (1.4.1-r1)
+#5 5.166 (16/28) Installing gcc (16.2.0-r1)
+#5 8.246 (17/28) Installing make (4.4.1-r15)
+#5 8.386 (18/28) Installing pkgconf (3.0.9-r0)
+#5 8.571 (19/28) Installing build-base (1-r10)
+#5 8.678 (20/28) Installing curl (8.23.0-r0)
+#5 8.793 (21/28) Installing openssl-4.0-dev (4.0.3-r7)
+#5 9.197 (22/28) Installing libbz2-1 (1.0.8-r25)
+#5 9.329 (23/28) Installing perl (5.44.0-r1)
+#5 9.908 (24/28) Installing libabsl2608.0.0 (20260817.0-r4)
+#5 10.10 (25/28) Installing libprotoc36.2.0 (36.2-r0)
+#5 10.30 (26/28) Installing libprotobuf36.2.0 (36.2-r0)
+#5 10.49 (27/28) Installing protobuf (36.2-r0)
+#5 10.66 (28/28) Installing protoc (36.2-r0)
+#5 10.78 Executing busybox-1.38.0-r3.trigger
+#5 10.88 OK: 655 MiB in 71 packages
+#5 DONE 11.8s
+
+#6 [prod 2/4] RUN set -eux;     arch="$(uname -m)";     case "$arch" in         x86_64)  triple=x86_64-unknown-linux-musl ;;         aarch64) triple=aarch64-unknown-linux-musl ;;         *) echo "unsupported arch: $arch" >&2; exit 1 ;;     esac;     curl -fsSL "https://github.com/mozilla/sccache/releases/download/v0.15.0/sccache-v0.15.0-${triple}.tar.gz"         | tar -xz --strip-components=1 -C /usr/local/bin "sccache-v0.15.0-${triple}/sccache";     chmod +x /usr/local/bin/sccache;     sccache --version
+#6 0.281 + uname -m
+#6 0.281 + arch=x86_64
+#6 0.281 + triple=x86_64-unknown-linux-musl
+#6 0.282 + curl -fsSL https://github.com/mozilla/sccache/releases/download/v0.15.0/sccache-v0.15.0-x86_64-unknown-linux-musl.tar.gz
+#6 0.282 + tar -xz '--strip-components=1' -C /usr/local/bin sccache-v0.15.0-x86_64-unknown-linux-musl/sccache
+#6 0.608 + chmod +x /usr/local/bin/sccache
+#6 0.609 + sccache --version
+#6 0.610 sccache 0.15.0
+#6 DONE 0.7s
+
+#7 [prod 3/4] RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain=1.98.1 &&     . /root/.cargo/env
+#7 0.364 info: downloading installer
+#7 0.561 info: profile set to default
+#7 0.561 info: default host tuple is x86_64-unknown-linux-gnu
+#7 0.562 info: syncing channel updates for 1.98.1-x86_64-unknown-linux-gnu
+#7 0.690 info: latest update on 2026-09-03 for version 1.98.1 (48a229cea 2026-09-01)
+#7 0.690 info: downloading 6 components
+#7 19.36 
+#7 19.36 info: default toolchain set to 1.98.1-x86_64-unknown-linux-gnu
+#7 19.37   1.98.1-x86_64-unknown-linux-gnu installed - rustc 1.98.1 (48a229cea 2026-09-01)
+#7 19.37 
+#7 19.38 
+#7 19.38 Rust is installed now. Great!
+#7 19.38 
+#7 19.38 To get started you may need to restart your current shell.
+#7 19.38 This would reload your PATH environment variable to include
+#7 19.38 Cargo's bin directory ($HOME/.cargo/bin).
+#7 19.38 
+#7 19.38 To configure your current shell, you need to source the
+#7 19.38 corresponding env file under $HOME/.cargo.
+#7 19.38 
+#7 19.38 Consider running the right command for your shell (note the leading DOT):
+#7 19.38 . "$HOME/.cargo/env" # For sh/ash/dash/pdksh
+#7 19.38 cargo:rerun-if-env-changed=CC_x86_64-unknown-linux-gnu
+#7 19.38 CC_x86_64-unknown-linux-gnu = None
+#7 19.38 cargo:rerun-if-env-changed=CC_x86_64_unknown_linux_gnu
+#7 19.38 CC_x86_64_unknown_linux_gnu = None
+#7 19.38 cargo:rerun-if-env-changed=HOST_CC
+#7 19.38 HOST_CC = None
+#7 19.38 cargo:rerun-if-env-changed=CC
+#7 19.38 CC = None
+#7 19.38 cargo:rerun-if-env-changed=CC_ENABLE_DEBUG_OUTPUT
+#7 19.40 cargo:rerun-if-env-changed=CRATE_CC_NO_DEFAULTS
+#7 19.40 CRATE_CC_NO_DEFAULTS = None
+#7 19.40 cargo:rerun-if-env-changed=CFLAGS
+#7 19.40 CFLAGS = None
+#7 19.40 cargo:rerun-if-env-changed=HOST_CFLAGS
+#7 19.40 HOST_CFLAGS = None
+#7 19.40 cargo:rerun-if-env-changed=CFLAGS_x86_64_unknown_linux_gnu
+#7 19.40 CFLAGS_x86_64_unknown_linux_gnu = None
+#7 19.40 cargo:rerun-if-env-changed=CFLAGS_x86_64-unknown-linux-gnu
+#7 19.40 CFLAGS_x86_64-unknown-linux-gnu = None
+#7 DONE 20.4s
+
+#8 exporting to image
+#8 exporting layers
+#8 exporting layers 49.4s done
+#8 exporting manifest sha256:77ef7e8187cc863616246f16b23fe46dc6d18507fd2cc37762121a0bf30fe9bf 0.0s done
+#8 exporting config sha256:f90ae1a5193abbc1500249520eaef9a2283a998e19e5becc0479cb877346550a 0.0s done
+#8 exporting attestation manifest sha256:e57ce3c908c59385a25fc4778aa1e16fb7f41d2331ea979b89f5d884b48b683d 0.0s done
+#8 exporting manifest list sha256:4d5ace81ba4d83bee70e51c1d67cb62d07f974dfedc75aa578f7b0484d06d5d0
+#8 exporting manifest list sha256:4d5ace81ba4d83bee70e51c1d67cb62d07f974dfedc75aa578f7b0484d06d5d0 0.0s done
+#8 naming to localhost/kms-antithesis/zama-golden:intermediate done
+#8 unpacking to localhost/kms-antithesis/zama-golden:intermediate
+#8 unpacking to localhost/kms-antithesis/zama-golden:intermediate 25.7s done
+#8 DONE 75.3s
+
+=== golden: zama-golden + AWS_LC_SYS_NO_JITTER_ENTROPY=1 ===
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from golden.Dockerfile
+#1 transferring dockerfile: 529B done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for localhost/kms-antithesis/zama-golden:intermediate
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [1/1] FROM localhost/kms-antithesis/zama-golden:intermediate@sha256:4d5ace81ba4d83bee70e51c1d67cb62d07f974dfedc75aa578f7b0484d06d5d0
+#4 resolve localhost/kms-antithesis/zama-golden:intermediate@sha256:4d5ace81ba4d83bee70e51c1d67cb62d07f974dfedc75aa578f7b0484d06d5d0 0.0s done
+#4 DONE 0.0s
+
+#4 [1/1] FROM localhost/kms-antithesis/zama-golden:intermediate@sha256:4d5ace81ba4d83bee70e51c1d67cb62d07f974dfedc75aa578f7b0484d06d5d0
+#4 DONE 0.2s
+
+#5 exporting to image
+#5 exporting layers done
+#5 exporting manifest sha256:024b35428e403925f0caba46fb809f948ffe948d92e9f65843bb8603323d8926 0.0s done
+#5 exporting config sha256:362808a60dbf45448a99e15553fa6642a24f7c8a0c3457cc51dcee16354a5c88 0.0s done
+#5 exporting attestation manifest sha256:41c54cc5ed2063f7ab4f1175ae0682801d0a0f4bb6aacf47aeccd7c26606b6ce 0.0s done
+#5 exporting manifest list sha256:13a77880df587b7901cc3078e61d27944e71acbeed380df3bdb049ad1ec8bd88 0.0s done
+#5 naming to localhost/kms-antithesis/rust-golden:intermediate done
+#5 unpacking to localhost/kms-antithesis/rust-golden:intermediate 0.0s done
+#5 DONE 0.2s
+
+=== kms-binaries (insecure, instrumented) ===
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from kms-binaries.Dockerfile
+#1 transferring dockerfile: 3.60kB done
+#1 DONE 0.0s
+
+#2 resolve image config for docker-image://docker.io/docker/dockerfile:1
+#2 DONE 0.2s
+
+#3 docker-image://docker.io/docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+#3 resolve docker.io/docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e 0.0s done
+#3 CACHED
+
+#4 [internal] load metadata for localhost/kms-antithesis/rust-golden:intermediate
+#4 DONE 0.0s
+
+#5 [internal] load .dockerignore
+#5 transferring context: 372B done
+#5 DONE 0.0s
+
+#6 [builder  1/12] FROM localhost/kms-antithesis/rust-golden:intermediate@sha256:13a77880df587b7901cc3078e61d27944e71acbeed380df3bdb049ad1ec8bd88
+#6 resolve localhost/kms-antithesis/rust-golden:intermediate@sha256:13a77880df587b7901cc3078e61d27944e71acbeed380df3bdb049ad1ec8bd88 0.0s done
+#6 CACHED
+
+#7 [internal] load build context
+#7 ...
+
+#8 [builder  2/12] WORKDIR /app/kms-binaries
+#8 DONE 0.1s
+
+#7 [internal] load build context
+#7 transferring context: 13.23MB 0.3s done
+#7 DONE 0.5s
+
+#9 [builder  3/12] COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
+#9 DONE 0.2s
+
+#10 [builder  4/12] COPY backward-compatibility ./backward-compatibility
+#10 DONE 0.1s
+
+#11 [builder  5/12] COPY bc2wrap ./bc2wrap
+#11 DONE 0.1s
+
+#12 [builder  6/12] COPY core ./core
+#12 DONE 0.2s
+
+#13 [builder  7/12] COPY core-client ./core-client
+#13 DONE 0.1s
+
+#14 [builder  8/12] COPY observability ./observability
+#14 DONE 0.1s
+
+#15 [builder  9/12] COPY tools ./tools
+#15 DONE 0.1s
+
+#16 [builder 10/12] RUN mkdir -p /out/core-service/bin /out/core-client/bin
+#16 DONE 0.3s
+
+#17 [builder 11/12] RUN --mount=type=cache,target=/root/.cargo/registry,sharing=locked     cargo fetch --locked
+#17 0.404     Updating git repository `https://github.com/zama-ai/rcgen.git`
+#17 0.748     Updating git repository `https://github.com/zama-ai/rustls.git`
+#17 3.341     Updating git repository `https://github.com/zama-ai/webpki.git`
+#17 4.038     Updating git repository `https://github.com/evervault/attestation-doc-validation`
+#17 DONE 5.4s
+
+#18 [builder 12/12] RUN --mount=type=cache,target=/root/.cargo/registry,sharing=locked     --mount=type=cache,id=kms-antithesis-target,target=/app/kms-binaries/target,sharing=locked     set -eu &&     cargo build --locked --profile=release-lto-off --target x86_64-unknown-linux-gnu         -p kms --bin kms-server --bin kms-gen-tls-certs --bin kms-init --bin kms-custodian --bin kms-gen-keys         -p kms-core-client --bin kms-core-client         -p kms-health-check --bin kms-health-check         --features insecure &&     cd target/x86_64-unknown-linux-gnu/release-lto-off &&     cp kms-server kms-gen-tls-certs kms-init kms-gen-keys kms-custodian /out/core-service/bin/ &&     cp kms-core-client kms-health-check kms-custodian /out/core-client/bin/ &&     echo insecure > /out/kms-build-flavor
+#18 2.076    Compiling bc2wrap v2.0.1 (/app/kms-binaries/bc2wrap)
+#18 2.092    Compiling error-utils v0.15.0-1 (/app/kms-binaries/core/error-utils)
+#18 2.098    Compiling threshold-networking v0.15.0-1 (/app/kms-binaries/core/threshold-networking)
+#18 2.104    Compiling kms-grpc v0.15.0-1 (/app/kms-binaries/core/grpc)
+#18 2.136    Compiling threshold-hashing v0.15.0-1 (/app/kms-binaries/core/threshold-hashing)
+#18 2.136    Compiling test-utils v0.15.0-1 (/app/kms-binaries/core/test-utils)
+#18 2.245    Compiling thread-handles v0.15.0-1 (/app/kms-binaries/core/thread-handles)
+#18 2.322    Compiling threshold-types v0.15.0-1 (/app/kms-binaries/core/threshold-types)
+#18 2.737    Compiling observability v0.15.0-1 (/app/kms-binaries/observability)
+#18 3.001    Compiling threshold-algebra v0.15.0-1 (/app/kms-binaries/core/threshold-algebra)
+#18 9.750    Compiling threshold-execution v0.15.0-1 (/app/kms-binaries/core/threshold-execution)
+#18 44.42    Compiling kms v0.15.0-1 (/app/kms-binaries/core/service)
+#18 729.4    Compiling kms-core-client v0.15.0-1 (/app/kms-binaries/core-client)
+#18 729.4    Compiling kms-health-check v0.15.0-1 (/app/kms-binaries/tools/kms-health-check)
+#18 1534.7     Finished `release-lto-off` profile [optimized] target(s) in 25m 34s
+#18 DONE 1545.4s
+
+#19 [binaries 1/1] COPY --from=builder /out /out
+#19 DONE 2.7s
+
+#20 exporting to image
+#20 exporting layers
+#20 exporting layers 69.0s done
+#20 exporting manifest sha256:2ee65891596cf5bfc4e28a8c1e09e1d2182f5aac5a89210f5046018c30571c39
+#20 exporting manifest sha256:2ee65891596cf5bfc4e28a8c1e09e1d2182f5aac5a89210f5046018c30571c39 0.0s done
+#20 exporting config sha256:e3244b75541937c8ffdda421c729c04ce009891369137b840a85bedb0de82e78 0.0s done
+#20 exporting attestation manifest sha256:6612baba44e63ad5c188f1eff2da5d08486655b509ee825dd2a998e305eb6ed1 0.0s done
+#20 exporting manifest list sha256:8c6fd788ceee5eff7c2f1bf3f2e1a4256314d25438594cc6f88717a5d02ed631 0.0s done
+#20 naming to localhost/kms-antithesis/kms-binaries:intermediate done
+#20 unpacking to localhost/kms-antithesis/kms-binaries:intermediate
+#20 unpacking to localhost/kms-antithesis/kms-binaries:intermediate 19.0s done
+#20 DONE 88.2s
+
+ [33m1 warning found (use docker --debug to expand):
+[0m - InvalidDefaultArgInFrom: Default value for ARG ${RUST_GOLDEN_IMAGE} results in empty or invalid base image name (line 26)
+
+=== core-service (prod, EXPECTED_KMS_FLAVOR=insecure) ===
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 4.35kB done
+#1 DONE 0.0s
+
+#2 resolve image config for docker-image://docker.io/docker/dockerfile:1
+#2 DONE 0.2s
+
+#3 docker-image://docker.io/docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+#3 resolve docker.io/docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e 0.0s done
+#3 CACHED
+
+#4 [internal] load metadata for localhost/kms-antithesis/kms-binaries:intermediate
+#4 DONE 0.0s
+
+#5 [internal] load metadata for localhost/kms-antithesis/rust-golden:intermediate
+#5 DONE 0.0s
+
+#6 [context cgr.dev/zama.ai/glibc-dynamic:16-dev] load metadata for cgr.dev/chainguard/glibc-dynamic:latest-dev
+#6 DONE 0.4s
+
+#7 [internal] load .dockerignore
+#7 transferring context: 372B done
+#7 DONE 0.0s
+
+#8 [internal] load build context
+#8 DONE 0.0s
+
+#9 [kms-binaries-source 1/1] FROM localhost/kms-antithesis/kms-binaries:intermediate@sha256:8c6fd788ceee5eff7c2f1bf3f2e1a4256314d25438594cc6f88717a5d02ed631
+#9 resolve localhost/kms-antithesis/kms-binaries:intermediate@sha256:8c6fd788ceee5eff7c2f1bf3f2e1a4256314d25438594cc6f88717a5d02ed631 0.1s done
+#9 DONE 0.1s
+
+#10 [enclave-utils 1/5] FROM localhost/kms-antithesis/rust-golden:intermediate@sha256:13a77880df587b7901cc3078e61d27944e71acbeed380df3bdb049ad1ec8bd88
+#10 resolve localhost/kms-antithesis/rust-golden:intermediate@sha256:13a77880df587b7901cc3078e61d27944e71acbeed380df3bdb049ad1ec8bd88 0.1s done
+#10 DONE 0.1s
+
+#11 [context cgr.dev/zama.ai/glibc-dynamic:16-dev] cgr.dev/chainguard/glibc-dynamic:latest-dev
+#11 resolve cgr.dev/chainguard/glibc-dynamic:latest-dev 0.1s done
+#11 CACHED
+
+#10 [enclave-utils 1/5] FROM localhost/kms-antithesis/rust-golden:intermediate@sha256:13a77880df587b7901cc3078e61d27944e71acbeed380df3bdb049ad1ec8bd88
+#10 CACHED
+
+#9 [kms-binaries-source 1/1] FROM localhost/kms-antithesis/kms-binaries:intermediate@sha256:8c6fd788ceee5eff7c2f1bf3f2e1a4256314d25438594cc6f88717a5d02ed631
+#9 DONE 0.1s
+
+#8 [internal] load build context
+#8 transferring context: 12.62kB 0.0s done
+#8 DONE 0.1s
+
+#12 [runtime  1/13] RUN apk update && apk add --no-cache     libssl3     socat     net-tools     yq     iptables     libgcc     libstdc++
+#12 ...
+
+#13 [enclave-utils 2/5] RUN mkdir -p /out/enclave-utils/bin
+#13 DONE 0.4s
+
+#14 [enclave-utils 3/5] WORKDIR /tmp
+#14 DONE 0.1s
+
+#15 [enclave-utils 4/5] RUN wget -qO dnsproxy.tar.gz https://github.com/AdGuardTeam/dnsproxy/releases/download/v0.81.1/dnsproxy-linux-amd64-v0.81.1.tar.gz &&     tar xzf dnsproxy.tar.gz &&     cp linux-amd64/dnsproxy /out/enclave-utils/bin/dnsproxy &&     chmod +x /out/enclave-utils/bin/dnsproxy
+#15 DONE 0.8s
+
+#12 [runtime  1/13] RUN apk update && apk add --no-cache     libssl3     socat     net-tools     yq     iptables     libgcc     libstdc++
+#12 0.453 fetch https://apk.cgr.dev/chainguard/x86_64/APKINDEX.tar.gz
+#12 1.726  [https://apk.cgr.dev/chainguard]
+#12 1.726 OK: 123688 distinct packages available
+#12 1.890 fetch https://apk.cgr.dev/chainguard/x86_64/APKINDEX.tar.gz
+#12 3.332 (1/8) Installing libmnl (1.0.5-r10)
+#12 3.883 (2/8) Installing libnftnl (1.3.2-r1)
+#12 4.021 (3/8) Installing iptables (1.8.13-r5)
+#12 4.223 (4/8) Installing libcrypto3 (3.6.5-r2)
+#12 4.379 (5/8) Installing libssl3 (3.6.5-r2)
+#12 4.512 (6/8) Installing net-tools (2.10-r37)
+#12 4.660 (7/8) Installing socat (1.8.1.3-r4)
+#12 4.834 (8/8) Installing yq (4.54.1-r1)
+#12 5.178 Executing busybox-1.38.0-r3.trigger
+#12 5.372 OK: 81 MiB in 51 packages
+#12 DONE 5.8s
+
+#16 [enclave-utils 5/5] RUN git clone --depth 1 --branch v0.1.0 https://github.com/zama-ai/vsocktun &&     cd vsocktun &&     cargo build --locked --release &&     cp target/release/vsocktun /out/enclave-utils/bin/vsocktun
+#16 0.428 Cloning into 'vsocktun'...
+#16 0.656 Note: switching to '412374af9c3cf8cd7c2bce3b30f4e058aa4a4ed5'.
+#16 0.656 
+#16 0.656 You are in 'detached HEAD' state. You can look around, make experimental
+#16 0.656 changes and commit them, and you can discard any commits you make in this
+#16 0.656 state without impacting any branches by switching back to a branch.
+#16 0.656 
+#16 0.656 If you want to create a new branch to retain commits you create, you may
+#16 0.656 do so (now or later) by using -c with the switch command. Example:
+#16 0.656 
+#16 0.656   git switch -c <new-branch-name>
+#16 0.656 
+#16 0.656 Or undo this operation with:
+#16 0.656 
+#16 0.656   git switch -
+#16 0.656 
+#16 0.656 Turn off this advice by setting config variable advice.detachedHead to false
+#16 0.656 
+#16 0.791     Updating crates.io index
+#16 1.214  Downloading crates ...
+#16 1.262   Downloaded anstream v0.6.21
+#16 1.267   Downloaded event-listener v5.4.1
+#16 1.269   Downloaded futures-util v0.3.32
+#16 1.286   Downloaded smallvec v1.15.2
+#16 1.288   Downloaded errno v0.3.14
+#16 1.290   Downloaded lock_api v0.4.14
+#16 1.292   Downloaded ipnet v2.12.0
+#16 1.294   Downloaded cfg-if v1.0.4
+#16 1.295   Downloaded anstyle-query v1.1.5
+#16 1.297   Downloaded futures-executor v0.3.32
+#16 1.298   Downloaded crossbeam-utils v0.8.21
+#16 1.302   Downloaded paste v1.0.15
+#16 1.308   Downloaded ciborium v0.2.2
+#16 1.313   Downloaded ciborium-io v0.2.2
+#16 1.314   Downloaded netlink-packet-core v0.8.1
+#16 1.317   Downloaded cfg_aliases v0.2.1
+#16 1.319   Downloaded netconfig-rs v0.1.6
+#16 1.322   Downloaded heck v0.5.0
+#16 1.324   Downloaded ciborium-ll v0.2.2
+#16 1.326   Downloaded concurrent-queue v2.5.0
+#16 1.329   Downloaded is_terminal_polyfill v1.70.2
+#16 1.331   Downloaded piper v0.2.5
+#16 1.337   Downloaded async-channel v2.5.0
+#16 1.340   Downloaded clap v4.5.47
+#16 1.350   Downloaded anyhow v1.0.100
+#16 1.357   Downloaded memchr v2.8.2
+#16 1.363   Downloaded memoffset v0.9.1
+#16 1.365   Downloaded byteorder v1.5.0
+#16 1.370   Downloaded colorchoice v1.0.5
+#16 1.371   Downloaded lazy_static v1.5.0
+#16 1.374   Downloaded utf8parse v0.2.2
+#16 1.375   Downloaded clap_derive v4.5.47
+#16 1.378   Downloaded tracing-attributes v0.1.31
+#16 1.380   Downloaded parking_lot v0.12.5
+#16 1.383   Downloaded futures-core v0.3.32
+#16 1.384   Downloaded parking v2.2.1
+#16 1.388   Downloaded event-listener-strategy v0.5.4
+#16 1.390   Downloaded vsock v0.5.4
+#16 1.392   Downloaded futures-sink v0.3.32
+#16 1.393   Downloaded strsim v0.11.1
+#16 1.394   Downloaded clap_lex v0.7.7
+#16 1.395   Downloaded futures-task v0.3.32
+#16 1.397   Downloaded futures-io v0.3.32
+#16 1.397   Downloaded futures-macro v0.3.32
+#16 1.399   Downloaded atomic-waker v1.1.2
+#16 1.400   Downloaded tokio-macros v2.7.0
+#16 1.401   Downloaded tracing-log v0.2.0
+#16 1.403   Downloaded anstyle v1.0.14
+#16 1.406   Downloaded netlink-sys v0.8.8
+#16 1.410   Downloaded fastrand v2.4.1
+#16 1.413   Downloaded futures-lite v2.6.1
+#16 1.417   Downloaded half v2.7.1
+#16 1.423   Downloaded slab v0.4.12
+#16 1.425   Downloaded tokio-vsock v0.7.2
+#16 1.429   Downloaded getifaddrs v0.6.2
+#16 1.432   Downloaded nu-ansi-term v0.50.3
+#16 1.437   Downloaded pin-project-lite v0.2.17
+#16 1.448   Downloaded signal-hook-registry v1.4.8
+#16 1.450   Downloaded thread_local v1.1.9
+#16 1.455   Downloaded anstyle-parse v0.2.7
+#16 1.457   Downloaded autocfg v1.5.1
+#16 1.461   Downloaded blocking v1.6.2
+#16 1.463   Downloaded scopeguard v1.2.0
+#16 1.467   Downloaded thiserror v2.0.18
+#16 1.478   Downloaded thiserror-impl v2.0.18
+#16 1.481   Downloaded futures-channel v0.3.32
+#16 1.485   Downloaded log v0.4.33
+#16 1.491   Downloaded quote v1.0.40
+#16 1.497   Downloaded serde_derive v1.0.228
+#16 1.504   Downloaded unicode-ident v1.0.22
+#16 1.510   Downloaded futures v0.3.32
+#16 1.521   Downloaded parking_lot_core v0.9.12
+#16 1.525   Downloaded proc-macro2 v1.0.103
+#16 1.530   Downloaded serde_core v1.0.228
+#16 1.536   Downloaded sharded-slab v0.1.7
+#16 1.541   Downloaded async-task v4.7.1
+#16 1.546   Downloaded bitflags v2.13.0
+#16 1.552   Downloaded bytemuck_derive v1.10.2
+#16 1.554   Downloaded bytes v1.12.0
+#16 1.561   Downloaded once_cell v1.21.4
+#16 1.565   Downloaded serde v1.0.228
+#16 1.571   Downloaded socket2 v0.6.4
+#16 1.575   Downloaded tracing-core v0.1.36
+#16 1.580   Downloaded zerocopy-derive v0.8.52
+#16 1.594   Downloaded bytemuck v1.23.2
+#16 1.598   Downloaded mio v1.2.1
+#16 1.607   Downloaded clap_builder v4.5.47
+#16 1.619   Downloaded netlink-packet-route v0.25.1
+#16 1.644   Downloaded tun-rs v2.8.3
+#16 1.657   Downloaded netlink-packet-route v0.28.0
+#16 1.690   Downloaded route_manager v0.2.11
+#16 1.704   Downloaded tracing-subscriber v0.3.22
+#16 1.724   Downloaded zerocopy v0.8.52
+#16 1.756   Downloaded nix v0.31.3
+#16 1.783   Downloaded syn v2.0.106
+#16 1.806   Downloaded nix v0.30.1
+#16 1.825   Downloaded tracing v0.1.44
+#16 1.873   Downloaded libc v0.2.186
+#16 1.945   Downloaded tokio v1.52.3
+#16 2.119    Compiling proc-macro2 v1.0.103
+#16 2.119    Compiling unicode-ident v1.0.22
+#16 2.119    Compiling libc v0.2.186
+#16 2.119    Compiling cfg-if v1.0.4
+#16 2.119    Compiling pin-project-lite v0.2.17
+#16 2.119    Compiling cfg_aliases v0.2.1
+#16 2.119    Compiling bitflags v2.13.0
+#16 2.119    Compiling autocfg v1.5.1
+#16 2.123    Compiling log v0.4.33
+#16 2.124    Compiling futures-core v0.3.32
+#16 2.126    Compiling paste v1.0.15
+#16 2.126    Compiling crossbeam-utils v0.8.21
+#16 2.131    Compiling futures-io v0.3.32
+#16 2.143    Compiling bytes v1.12.0
+#16 2.154    Compiling smallvec v1.15.2
+#16 2.154    Compiling parking_lot_core v0.9.12
+#16 2.290    Compiling nix v0.31.3
+#16 2.305    Compiling zerocopy v0.8.52
+#16 2.345    Compiling parking v2.2.1
+#16 2.414    Compiling scopeguard v1.2.0
+#16 2.451    Compiling futures-sink v0.3.32
+#16 2.575    Compiling lock_api v0.4.14
+#16 2.611    Compiling futures-channel v0.3.32
+#16 2.617    Compiling nix v0.30.1
+#16 2.617    Compiling memchr v2.8.2
+#16 2.645    Compiling utf8parse v0.2.2
+#16 2.664    Compiling thiserror v2.0.18
+#16 2.723    Compiling serde_core v1.0.228
+#16 2.785    Compiling futures-task v0.3.32
+#16 2.848    Compiling slab v0.4.12
+#16 2.925    Compiling once_cell v1.21.4
+#16 2.930    Compiling anstyle-parse v0.2.7
+#16 2.947    Compiling memoffset v0.9.1
+#16 2.955    Compiling is_terminal_polyfill v1.70.2
+#16 3.022    Compiling anstyle-query v1.1.5
+#16 3.022    Compiling colorchoice v1.0.5
+#16 3.029    Compiling fastrand v2.4.1
+#16 3.029    Compiling anstyle v1.0.14
+#16 3.053    Compiling serde v1.0.228
+#16 3.071    Compiling atomic-waker v1.1.2
+#16 3.116    Compiling futures-lite v2.6.1
+#16 3.173    Compiling concurrent-queue v2.5.0
+#16 3.185    Compiling tracing-core v0.1.36
+#16 3.188    Compiling ciborium-io v0.2.2
+#16 3.193    Compiling lazy_static v1.5.0
+#16 3.217    Compiling ipnet v2.12.0
+#16 3.223    Compiling heck v0.5.0
+#16 3.265    Compiling tun-rs v2.8.3
+#16 3.281    Compiling piper v0.2.5
+#16 3.290    Compiling netlink-packet-core v0.8.1
+#16 3.405    Compiling anstream v0.6.21
+#16 3.418    Compiling route_manager v0.2.11
+#16 3.437    Compiling clap_lex v0.7.7
+#16 3.449    Compiling quote v1.0.40
+#16 3.458    Compiling anyhow v1.0.100
+#16 3.516    Compiling event-listener v5.4.1
+#16 3.568    Compiling async-task v4.7.1
+#16 3.674    Compiling strsim v0.11.1
+#16 3.804    Compiling sharded-slab v0.1.7
+#16 3.810    Compiling thread_local v1.1.9
+#16 3.830    Compiling event-listener-strategy v0.5.4
+#16 3.878    Compiling syn v2.0.106
+#16 3.891    Compiling tracing-log v0.2.0
+#16 3.894    Compiling nu-ansi-term v0.50.3
+#16 3.901    Compiling byteorder v1.5.0
+#16 3.917    Compiling async-channel v2.5.0
+#16 3.989    Compiling clap_builder v4.5.47
+#16 4.122    Compiling blocking v1.6.2
+#16 ...
+
+#17 [runtime  2/13] WORKDIR /app/kms/core/service
+#17 DONE 0.1s
+
+#16 [enclave-utils 5/5] RUN git clone --depth 1 --branch v0.1.0 https://github.com/zama-ai/vsocktun &&     cd vsocktun &&     cargo build --locked --release &&     cp target/release/vsocktun /out/enclave-utils/bin/vsocktun
+#16 4.520    Compiling tracing-subscriber v0.3.22
+#16 ...
+
+#18 [runtime  3/13] COPY ./core/service/config/ /app/kms/core/service/config
+#18 DONE 0.1s
+
+#16 [enclave-utils 5/5] RUN git clone --depth 1 --branch v0.1.0 https://github.com/zama-ai/vsocktun &&     cd vsocktun &&     cargo build --locked --release &&     cp target/release/vsocktun /out/enclave-utils/bin/vsocktun
+#16 5.261    Compiling errno v0.3.14
+#16 5.261    Compiling mio v1.2.1
+#16 5.261    Compiling netlink-sys v0.8.8
+#16 5.261    Compiling socket2 v0.6.4
+#16 5.261    Compiling netlink-packet-route v0.25.1
+#16 5.263    Compiling netlink-packet-route v0.28.0
+#16 5.267    Compiling getifaddrs v0.6.2
+#16 5.357    Compiling signal-hook-registry v1.4.8
+#16 5.485    Compiling parking_lot v0.12.5
+#16 6.696    Compiling vsock v0.5.4
+#16 8.549    Compiling futures-macro v0.3.32
+#16 8.549    Compiling zerocopy-derive v0.8.52
+#16 8.549    Compiling tokio-macros v2.7.0
+#16 8.549    Compiling thiserror-impl v2.0.18
+#16 8.549    Compiling serde_derive v1.0.228
+#16 8.549    Compiling bytemuck_derive v1.10.2
+#16 8.549    Compiling clap_derive v4.5.47
+#16 8.551    Compiling tracing-attributes v0.1.31
+#16 9.005    Compiling tokio v1.52.3
+#16 9.061    Compiling futures-util v0.3.32
+#16 9.512    Compiling bytemuck v1.23.2
+#16 9.565    Compiling tracing v0.1.44
+#16 10.01    Compiling clap v4.5.47
+#16 10.97    Compiling netconfig-rs v0.1.6
+#16 12.77    Compiling futures-executor v0.3.32
+#16 13.13    Compiling futures v0.3.32
+#16 14.33    Compiling half v2.7.1
+#16 14.62    Compiling ciborium-ll v0.2.2
+#16 14.75    Compiling ciborium v0.2.2
+#16 14.87    Compiling tokio-vsock v0.7.2
+#16 17.31    Compiling vsocktun v0.1.0 (/tmp/vsocktun)
+#16 20.33     Finished `release` profile [optimized] target(s) in 19.64s
+#16 DONE 20.9s
+
+#19 [runtime  4/13] COPY --from=enclave-utils /out/enclave-utils/bin/dnsproxy /usr/bin/dnsproxy
+#19 DONE 0.1s
+
+#20 [runtime  5/13] COPY --from=enclave-utils /out/enclave-utils/bin/vsocktun /usr/bin/vsocktun
+#20 DONE 0.1s
+
+#21 [runtime  6/13] COPY --from=kms-binaries-source /out/core-service/bin/ ./bin/
+#21 DONE 4.6s
+
+#22 [runtime  7/13] COPY --from=kms-binaries-source /out/kms-build-flavor ./kms-build-flavor
+#22 DONE 0.1s
+
+#23 [runtime  8/13] COPY ./docker/core/service/start_parent_proxies.sh ./bin/
+#23 DONE 0.1s
+
+#24 [runtime  9/13] COPY ./docker/core/service/init_enclave.sh ./bin/
+#24 DONE 0.1s
+
+#25 [runtime 10/13] RUN addgroup -S kms --gid 10002 &&     adduser -D -s /bin/sh --uid 10003 -G kms kms
+#25 DONE 0.3s
+
+#26 [runtime 11/13] RUN mkdir -p /app/kms/core/service/certs /app/kms/core/service/config
+#26 DONE 0.3s
+
+#27 [runtime 12/13] RUN chown -R kms:kms /app/kms
+#27 DONE 5.3s
+
+#28 [prod 1/1] RUN case "insecure" in secure|insecure) ;; *) exit 1 ;; esac &&     test "$(cat ./kms-build-flavor)" = "insecure"
+#28 DONE 0.3s
+
+#29 exporting to image
+#29 exporting layers
+#29 exporting layers 47.8s done
+#29 exporting manifest sha256:d09998ae8d13f4a98d1741085d50398ecff4e989b286986db7d0379d5bde67fa 0.0s done
+#29 exporting config sha256:5b781bdd7de954750652907d06d376e614a465fa4e07aa563350b27118a864be 0.0s done
+#29 exporting attestation manifest sha256:b83d80139ce4fd2060f9bfc78fb89e94df32d20d5a968f2ae8f81f7a09fba06e 0.0s done
+#29 exporting manifest list sha256:f59936e26c91ba52904df6db189785c940775c5203d1f5a76c9bd1bf850f033d
+#29 exporting manifest list sha256:f59936e26c91ba52904df6db189785c940775c5203d1f5a76c9bd1bf850f033d 0.0s done
+#29 naming to localhost/kms-antithesis/zama-core-service:intermediate done
+#29 unpacking to localhost/kms-antithesis/zama-core-service:intermediate
+#29 unpacking to localhost/kms-antithesis/zama-core-service:intermediate 22.7s done
+#29 DONE 70.7s
+
+=== core-service-probe (dev, with grpc_health_probe) ===
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 4.35kB done
+#1 DONE 0.0s
+
+#2 resolve image config for docker-image://docker.io/docker/dockerfile:1
+#2 DONE 0.1s
+
+#3 docker-image://docker.io/docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+#3 resolve docker.io/docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e 0.0s done
+#3 CACHED
+
+#4 [internal] load metadata for localhost/kms-antithesis/rust-golden:intermediate
+#4 DONE 0.1s
+
+#5 [internal] load metadata for localhost/kms-antithesis/kms-binaries:intermediate
+#5 DONE 0.1s
+
+#6 [context cgr.dev/zama.ai/golang:1.25] load metadata for cgr.dev/chainguard/go:latest
+#6 DONE 0.2s
+
+#7 [context cgr.dev/zama.ai/glibc-dynamic:16-dev] load metadata for cgr.dev/chainguard/glibc-dynamic:latest-dev
+#7 DONE 0.3s
+
+#8 [internal] load .dockerignore
+#8 transferring context: 372B done
+#8 DONE 0.0s
+
+#9 [internal] load build context
+#9 DONE 0.0s
+
+#10 [enclave-utils 1/5] FROM localhost/kms-antithesis/rust-golden:intermediate@sha256:13a77880df587b7901cc3078e61d27944e71acbeed380df3bdb049ad1ec8bd88
+#10 resolve localhost/kms-antithesis/rust-golden:intermediate@sha256:13a77880df587b7901cc3078e61d27944e71acbeed380df3bdb049ad1ec8bd88 0.1s done
+#10 DONE 0.1s
+
+#11 [kms-binaries-source 1/1] FROM localhost/kms-antithesis/kms-binaries:intermediate@sha256:8c6fd788ceee5eff7c2f1bf3f2e1a4256314d25438594cc6f88717a5d02ed631
+#11 resolve localhost/kms-antithesis/kms-binaries:intermediate@sha256:8c6fd788ceee5eff7c2f1bf3f2e1a4256314d25438594cc6f88717a5d02ed631 0.1s done
+#11 DONE 0.1s
+
+#12 [context cgr.dev/zama.ai/glibc-dynamic:16-dev] cgr.dev/chainguard/glibc-dynamic:latest-dev
+#12 resolve cgr.dev/chainguard/glibc-dynamic:latest-dev 0.1s done
+#12 DONE 0.1s
+
+#13 [context cgr.dev/zama.ai/golang:1.25] cgr.dev/chainguard/go:latest
+#13 resolve cgr.dev/chainguard/go:latest
+#13 resolve cgr.dev/chainguard/go:latest 0.1s done
+#13 DONE 0.1s
+
+#9 [internal] load build context
+#9 transferring context: 1.31kB done
+#9 DONE 0.0s
+
+#14 [enclave-utils 5/5] RUN git clone --depth 1 --branch v0.1.0 https://github.com/zama-ai/vsocktun &&     cd vsocktun &&     cargo build --locked --release &&     cp target/release/vsocktun /out/enclave-utils/bin/vsocktun
+#14 CACHED
+
+#15 [runtime  5/13] COPY --from=enclave-utils /out/enclave-utils/bin/vsocktun /usr/bin/vsocktun
+#15 CACHED
+
+#16 [runtime  2/13] WORKDIR /app/kms/core/service
+#16 CACHED
+
+#17 [runtime  7/13] COPY --from=kms-binaries-source /out/kms-build-flavor ./kms-build-flavor
+#17 CACHED
+
+#18 [runtime  3/13] COPY ./core/service/config/ /app/kms/core/service/config
+#18 CACHED
+
+#19 [runtime 11/13] RUN mkdir -p /app/kms/core/service/certs /app/kms/core/service/config
+#19 CACHED
+
+#20 [runtime  9/13] COPY ./docker/core/service/init_enclave.sh ./bin/
+#20 CACHED
+
+#21 [runtime  6/13] COPY --from=kms-binaries-source /out/core-service/bin/ ./bin/
+#21 CACHED
+
+#22 [enclave-utils 4/5] RUN wget -qO dnsproxy.tar.gz https://github.com/AdGuardTeam/dnsproxy/releases/download/v0.81.1/dnsproxy-linux-amd64-v0.81.1.tar.gz &&     tar xzf dnsproxy.tar.gz &&     cp linux-amd64/dnsproxy /out/enclave-utils/bin/dnsproxy &&     chmod +x /out/enclave-utils/bin/dnsproxy
+#22 CACHED
+
+#23 [enclave-utils 3/5] WORKDIR /tmp
+#23 CACHED
+
+#24 [runtime 10/13] RUN addgroup -S kms --gid 10002 &&     adduser -D -s /bin/sh --uid 10003 -G kms kms
+#24 CACHED
+
+#25 [runtime  1/13] RUN apk update && apk add --no-cache     libssl3     socat     net-tools     yq     iptables     libgcc     libstdc++
+#25 CACHED
+
+#26 [runtime  4/13] COPY --from=enclave-utils /out/enclave-utils/bin/dnsproxy /usr/bin/dnsproxy
+#26 CACHED
+
+#27 [runtime  8/13] COPY ./docker/core/service/start_parent_proxies.sh ./bin/
+#27 CACHED
+
+#28 [enclave-utils 2/5] RUN mkdir -p /out/enclave-utils/bin
+#28 CACHED
+
+#29 [go-builder 1/2] RUN git clone https://github.com/grpc-ecosystem/grpc-health-probe &&     cd grpc-health-probe &&     git checkout v0.4.46 &&     go mod tidy &&     go build -ldflags="-s -w -extldflags '-static'" -o /out/grpc_health_probe .
+#29 CACHED
+
+#30 [runtime 12/13] RUN chown -R kms:kms /app/kms
+#30 CACHED
+
+#31 [dev 1/2] RUN test "$(cat ./kms-build-flavor)" = "insecure"
+#31 DONE 0.3s
+
+#32 [dev 2/2] COPY --chown=kms:kms --from=go-builder /out/grpc_health_probe /bin/grpc_health_probe
+#32 DONE 0.1s
+
+#33 exporting to image
+#33 exporting layers
+#33 exporting layers 0.9s done
+#33 exporting manifest sha256:761a0226782c3d4517be3d84ddcfb1a2d94d5d77f350be1e88c97c97cbfb142a 0.0s done
+#33 exporting config sha256:dc612f9b34a05d2cae6d6200254543defc39492eae698312d7ecf00966ea2cab 0.0s done
+#33 exporting attestation manifest sha256:88df8a34df5f85cfa0779545f4a76a60ed3313ce86204e3546852c45b76b9ec0 0.0s done
+#33 exporting manifest list sha256:2913dd76569484d7c0170f365684a764716cb6be2ca7469de1b8a367a4829a80
+#33 exporting manifest list sha256:2913dd76569484d7c0170f365684a764716cb6be2ca7469de1b8a367a4829a80 0.0s done
+#33 naming to localhost/kms-antithesis/zama-core-service-probe:intermediate done
+#33 unpacking to localhost/kms-antithesis/zama-core-service-probe:intermediate
+#33 unpacking to localhost/kms-antithesis/zama-core-service-probe:intermediate 0.2s done
+#33 DONE 1.2s
+
+=== core-client (prod, EXPECTED_KMS_FLAVOR=insecure) ===
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.89kB done
+#1 DONE 0.0s
+
+#2 resolve image config for docker-image://docker.io/docker/dockerfile:1
+#2 DONE 0.1s
+
+#3 docker-image://docker.io/docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+#3 resolve docker.io/docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e 0.0s done
+#3 CACHED
+
+#4 [internal] load metadata for localhost/kms-antithesis/kms-binaries:intermediate
+#4 DONE 0.0s
+
+#5 [context cgr.dev/zama.ai/glibc-dynamic:16-dev] load metadata for cgr.dev/chainguard/glibc-dynamic:latest-dev
+#5 DONE 0.0s
+
+#6 [internal] load .dockerignore
+#6 transferring context: 372B done
+#6 DONE 0.0s
+
+#7 [context cgr.dev/zama.ai/glibc-dynamic:16-dev] cgr.dev/chainguard/glibc-dynamic:latest-dev
+#7 resolve cgr.dev/chainguard/glibc-dynamic:latest-dev 0.1s done
+#7 CACHED
+
+#8 [kms-binaries-source 1/1] FROM localhost/kms-antithesis/kms-binaries:intermediate@sha256:8c6fd788ceee5eff7c2f1bf3f2e1a4256314d25438594cc6f88717a5d02ed631
+#8 resolve localhost/kms-antithesis/kms-binaries:intermediate@sha256:8c6fd788ceee5eff7c2f1bf3f2e1a4256314d25438594cc6f88717a5d02ed631 0.0s done
+#8 CACHED
+
+#9 [runtime 1/7] RUN apk add --no-cache         openssl         wget         libgcc         libstdc++
+#9 0.294 fetch https://apk.cgr.dev/chainguard/x86_64/APKINDEX.tar.gz
+#9 1.670 (1/1) Installing openssl-4.0 (4.0.3-r7)
+#9 1.870 Executing busybox-1.38.0-r3.trigger
+#9 1.897 OK: 56 MiB in 44 packages
+#9 DONE 2.1s
+
+#10 [runtime 2/7] WORKDIR /app/kms-core-client
+#10 DONE 0.1s
+
+#11 [runtime 3/7] COPY --from=kms-binaries-source /out/core-client/bin/ ./bin/
+#11 DONE 3.5s
+
+#12 [runtime 4/7] COPY --from=kms-binaries-source /out/kms-build-flavor ./kms-build-flavor
+#12 DONE 0.1s
+
+#13 [runtime 5/7] RUN addgroup -S kms --gid 10002 &&     adduser -D -s /bin/sh --uid 10003 -G kms kms
+#13 DONE 0.3s
+
+#14 [runtime 6/7] RUN chown -R kms:kms /app/kms-core-client
+#14 DONE 3.6s
+
+#15 [prod 1/1] RUN case "insecure" in secure|insecure) ;; *) exit 1 ;; esac &&     test "$(cat ./kms-build-flavor)" = "insecure"
+#15 DONE 0.3s
+
+#16 exporting to image
+#16 exporting layers
+#16 exporting layers 25.2s done
+#16 exporting manifest sha256:b38bdeaeaa9ec09427491f0a7152422d7f19bc986cbfef5ba613ad443a5cd4ca 0.0s done
+#16 exporting config sha256:ce114e9bfea54806333c319aa2c411bdedb2212fb6e387121692af457fba8f09 0.0s done
+#16 exporting attestation manifest sha256:40b34a72e72e45ee4b7ead417db3458436d8502d74920673d56012490d821dbb 0.0s done
+#16 exporting manifest list sha256:bec52ec915f3e90ac3465d3472d21fd4e9116d7541b7cd439a9efe932533736b
+#16 exporting manifest list sha256:bec52ec915f3e90ac3465d3472d21fd4e9116d7541b7cd439a9efe932533736b 0.0s done
+#16 naming to localhost/kms-antithesis/zama-core-client:intermediate done
+#16 unpacking to localhost/kms-antithesis/zama-core-client:intermediate
+#16 unpacking to localhost/kms-antithesis/zama-core-client:intermediate 11.2s done
+#16 DONE 36.5s
+
+=== symbols: core-service ===
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from symbols.Dockerfile
+#1 transferring dockerfile: 420B done
+#1 WARN: InvalidDefaultArgInFrom: Default value for ARG ${BASE_IMAGE} results in empty or invalid base image name (line 5)
+#1 DONE 0.0s
+
+#2 [internal] load metadata for localhost/kms-antithesis/zama-core-service:intermediate
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [1/2] FROM localhost/kms-antithesis/zama-core-service:intermediate@sha256:f59936e26c91ba52904df6db189785c940775c5203d1f5a76c9bd1bf850f033d
+#4 resolve localhost/kms-antithesis/zama-core-service:intermediate@sha256:f59936e26c91ba52904df6db189785c940775c5203d1f5a76c9bd1bf850f033d 0.0s done
+#4 DONE 0.4s
+
+#5 [2/2] RUN set -e; mkdir /symbols;     for f in "/app/kms/core/service/bin"/kms-*; do test -x "$f"; ln -s "$f" /symbols/; done;     ls -l /symbols
+#5 0.211 total 0
+#5 0.211 lrwxrwxrwx    1 root     root            39 Oct 18 06:50 kms-custodian -> /app/kms/core/service/bin/kms-custodian
+#5 0.211 lrwxrwxrwx    1 root     root            38 Oct 18 06:50 kms-gen-keys -> /app/kms/core/service/bin/kms-gen-keys
+#5 0.211 lrwxrwxrwx    1 root     root            43 Oct 18 06:50 kms-gen-tls-certs -> /app/kms/core/service/bin/kms-gen-tls-certs
+#5 0.211 lrwxrwxrwx    1 root     root            34 Oct 18 06:50 kms-init -> /app/kms/core/service/bin/kms-init
+#5 0.211 lrwxrwxrwx    1 root     root            36 Oct 18 06:50 kms-server -> /app/kms/core/service/bin/kms-server
+#5 DONE 3.7s
+
+#6 exporting to image
+#6 exporting layers 0.1s done
+#6 exporting manifest sha256:05c36e9b9a90878341d6355c6ea51c13f0fd6216813e29c92ee14014c6ec9780 0.0s done
+#6 exporting config sha256:026baa685f4b9f3e92fd50061ea65c03f2ac33d1b7a3eab96ceff51edc24b724 0.0s done
+#6 exporting attestation manifest sha256:f06c469e5d0a2f6e8c1c1fd114da9d8c59b7902eda7cb917a2e7b085a1349f8f 0.0s done
+#6 exporting manifest list sha256:2b54e0b3515192908a43e3ab11fd2e0c1058c5f9bf416930530346e04675fc70
+#6 exporting manifest list sha256:2b54e0b3515192908a43e3ab11fd2e0c1058c5f9bf416930530346e04675fc70 0.0s done
+#6 naming to us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-service:speedrun-3095d82a-fix-decryption-stalls done
+#6 unpacking to us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-service:speedrun-3095d82a-fix-decryption-stalls 0.0s done
+#6 DONE 0.4s
+
+ [33m1 warning found (use docker --debug to expand):
+[0m - InvalidDefaultArgInFrom: Default value for ARG ${BASE_IMAGE} results in empty or invalid base image name (line 5)
+
+=== symbols: core-service-probe ===
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from symbols.Dockerfile
+#1 transferring dockerfile: 420B done
+#1 WARN: InvalidDefaultArgInFrom: Default value for ARG ${BASE_IMAGE} results in empty or invalid base image name (line 5)
+#1 DONE 0.0s
+
+#2 [internal] load metadata for localhost/kms-antithesis/zama-core-service-probe:intermediate
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [1/2] FROM localhost/kms-antithesis/zama-core-service-probe:intermediate@sha256:2913dd76569484d7c0170f365684a764716cb6be2ca7469de1b8a367a4829a80
+#4 resolve localhost/kms-antithesis/zama-core-service-probe:intermediate@sha256:2913dd76569484d7c0170f365684a764716cb6be2ca7469de1b8a367a4829a80 0.0s done
+#4 DONE 0.3s
+
+#5 [2/2] RUN set -e; mkdir /symbols;     for f in "/app/kms/core/service/bin"/kms-*; do test -x "$f"; ln -s "$f" /symbols/; done;     ls -l /symbols
+#5 0.192 total 0
+#5 0.192 lrwxrwxrwx    1 root     root            39 Oct 18 06:50 kms-custodian -> /app/kms/core/service/bin/kms-custodian
+#5 0.192 lrwxrwxrwx    1 root     root            38 Oct 18 06:50 kms-gen-keys -> /app/kms/core/service/bin/kms-gen-keys
+#5 0.192 lrwxrwxrwx    1 root     root            43 Oct 18 06:50 kms-gen-tls-certs -> /app/kms/core/service/bin/kms-gen-tls-certs
+#5 0.192 lrwxrwxrwx    1 root     root            34 Oct 18 06:50 kms-init -> /app/kms/core/service/bin/kms-init
+#5 0.192 lrwxrwxrwx    1 root     root            36 Oct 18 06:50 kms-server -> /app/kms/core/service/bin/kms-server
+#5 DONE 0.2s
+
+#6 exporting to image
+#6 exporting layers 0.1s done
+#6 exporting manifest sha256:29f86c9be3af997dfc877785000be5fb1294798a511d6a9057cf5253905aec80 0.0s done
+#6 exporting config sha256:eacc82e4d2917ede8b42e5b1d7551edbaab31c3a07b53a9f56df0c9a350cdca8 0.0s done
+#6 exporting attestation manifest sha256:ef3b58d11de264fbaf2e525e7a242a98ff9ba15426719444139781b2dd6d0399 0.0s done
+#6 exporting manifest list sha256:6aab4dd888f38fd3d78443b8263ab45f2fc8e6c6229bd9127d872bbe75008a7d
+#6 exporting manifest list sha256:6aab4dd888f38fd3d78443b8263ab45f2fc8e6c6229bd9127d872bbe75008a7d 0.0s done
+#6 naming to us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-service-probe:speedrun-3095d82a-fix-decryption-stalls done
+#6 unpacking to us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-service-probe:speedrun-3095d82a-fix-decryption-stalls 0.0s done
+#6 DONE 0.4s
+
+ [33m1 warning found (use docker --debug to expand):
+[0m - InvalidDefaultArgInFrom: Default value for ARG ${BASE_IMAGE} results in empty or invalid base image name (line 5)
+
+=== symbols: core-client ===
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from symbols.Dockerfile
+#1 transferring dockerfile: 420B done
+#1 WARN: InvalidDefaultArgInFrom: Default value for ARG ${BASE_IMAGE} results in empty or invalid base image name (line 5)
+#1 DONE 0.0s
+
+#2 [internal] load metadata for localhost/kms-antithesis/zama-core-client:intermediate
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [1/2] FROM localhost/kms-antithesis/zama-core-client:intermediate@sha256:bec52ec915f3e90ac3465d3472d21fd4e9116d7541b7cd439a9efe932533736b
+#4 resolve localhost/kms-antithesis/zama-core-client:intermediate@sha256:bec52ec915f3e90ac3465d3472d21fd4e9116d7541b7cd439a9efe932533736b 0.0s done
+#4 DONE 0.0s
+
+#4 [1/2] FROM localhost/kms-antithesis/zama-core-client:intermediate@sha256:bec52ec915f3e90ac3465d3472d21fd4e9116d7541b7cd439a9efe932533736b
+#4 DONE 0.2s
+
+#5 [2/2] RUN set -e; mkdir /symbols;     for f in "/app/kms-core-client/bin"/kms-*; do test -x "$f"; ln -s "$f" /symbols/; done;     ls -l /symbols
+#5 0.205 total 0
+#5 0.205 lrwxrwxrwx    1 root     root            40 Oct 18 06:50 kms-core-client -> /app/kms-core-client/bin/kms-core-client
+#5 0.205 lrwxrwxrwx    1 root     root            38 Oct 18 06:50 kms-custodian -> /app/kms-core-client/bin/kms-custodian
+#5 0.205 lrwxrwxrwx    1 root     root            41 Oct 18 06:50 kms-health-check -> /app/kms-core-client/bin/kms-health-check
+#5 DONE 0.2s
+
+#6 exporting to image
+#6 exporting layers 0.1s done
+#6 exporting manifest sha256:1b092bdb4219207432548397c2619b96c3dce1238e6575cf07cbab3a8c5e2630 0.0s done
+#6 exporting config sha256:df83e87f28f02587c5fd270814c3d635a04839bdbec9c81da9b7211119024b95 0.0s done
+#6 exporting attestation manifest sha256:e529229bd722a3f34202d5bbd68b172634c64379f387270ad8f059b8b2309510 0.0s done
+#6 exporting manifest list sha256:ee84707ac41ffb56f70a8557dc532ec3b9482e73783e2e99224d8ceba8f8cd08 0.0s done
+#6 naming to us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-client:speedrun-3095d82a-fix-decryption-stalls
+#6 naming to us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-client:speedrun-3095d82a-fix-decryption-stalls done
+#6 unpacking to us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-client:speedrun-3095d82a-fix-decryption-stalls 0.0s done
+#6 DONE 0.3s
+
+ [33m1 warning found (use docker --debug to expand):
+[0m - InvalidDefaultArgInFrom: Default value for ARG ${BASE_IMAGE} results in empty or invalid base image name (line 5)
+
+=== init-envsubst ===
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.41kB done
+#1 DONE 0.0s
+
+#2 resolve image config for docker-image://docker.io/docker/dockerfile:1
+#2 DONE 0.1s
+
+#3 docker-image://docker.io/docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+#3 resolve docker.io/docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e 0.0s done
+#3 CACHED
+
+#4 [internal] load metadata for cgr.dev/chainguard/glibc-dynamic:latest-dev
+#4 DONE 0.1s
+
+#5 [internal] load .dockerignore
+#5 transferring context:
+#5 transferring context: 2B done
+#5 DONE 0.0s
+
+#6 [1/2] FROM cgr.dev/chainguard/glibc-dynamic:latest-dev@sha256:02e805e74fcb94799a4cea8baad1122625259ac6b55d2c27b38c5825cdac3ca7
+#6 resolve cgr.dev/chainguard/glibc-dynamic:latest-dev@sha256:02e805e74fcb94799a4cea8baad1122625259ac6b55d2c27b38c5825cdac3ca7 0.0s done
+#6 CACHED
+
+#7 [2/2] RUN apk add --no-cache       gettext       curl       ca-certificates
+#7 0.207 fetch https://apk.cgr.dev/chainguard/x86_64/APKINDEX.tar.gz
+#7 2.102 (1/8) Installing ca-certificates (20260909-r2)
+#7 2.411 (2/8) Installing curl (8.23.0-r0)
+#7 2.791 (3/8) Installing gettext-envsubst (1.0-r8)
+#7 2.998 (4/8) Installing glibc-2.44-iconv (2.44-r8)
+#7 3.230 (5/8) Installing libgomp (16.2.0-r1)
+#7 3.426 (6/8) Installing libxml2 (2.15.0-r0)
+#7 3.555 (7/8) Installing xz (5.8.4-r0)
+#7 3.692 (8/8) Installing gettext (1.0-r8)
+#7 3.963 Executing busybox-1.38.0-r3.trigger
+#7 3.995 OK: 88 MiB in 51 packages
+#7 DONE 4.2s
+
+#8 exporting to image
+#8 exporting layers
+#8 exporting layers 1.3s done
+#8 exporting manifest sha256:f842744f94c063b56951c2f02cd7f389ee0611beec9283a0fdc3941f807c41f7 0.0s done
+#8 exporting config sha256:8f9c9a94ed5adb82dd2af3717edde2263099599340f95d19e9f96aee71368e53 0.0s done
+#8 exporting attestation manifest sha256:367e9e12462b917c592e23d6edd6e47ed871475d1a16d19ee406819c9b793ce3 0.0s done
+#8 exporting manifest list sha256:3dc0edb3c1eb2fa6153f42deb7eddcc6b53c05d77404693f6b3670f701474515
+#8 exporting manifest list sha256:3dc0edb3c1eb2fa6153f42deb7eddcc6b53c05d77404693f6b3670f701474515 0.0s done
+#8 naming to us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/init-envsubst:speedrun-3095d82a-fix-decryption-stalls done
+#8 unpacking to us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/init-envsubst:speedrun-3095d82a-fix-decryption-stalls
+#8 unpacking to us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/init-envsubst:speedrun-3095d82a-fix-decryption-stalls 0.3s done
+#8 DONE 1.7s
+
+=== Checking binaries ===
+  ok: kms-server
+  ok: kms-gen-keys
+  ok: kms-init
+  ok: kms-core-client
+
+Built:
+  us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-service:speedrun-3095d82a-fix-decryption-stalls
+  us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-service-probe:speedrun-3095d82a-fix-decryption-stalls
+  us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-client:speedrun-3095d82a-fix-decryption-stalls
+  us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/init-envsubst:speedrun-3095d82a-fix-decryption-stalls
+Tag recorded in /home/exedev/kms-fixverify/antithesis/build/tag
+=== speedrun build attempt 1 exit=0 ===
+build exit=0

@@ -1,0 +1,483 @@
+# KMS threshold party 2 of 4.
+#
+# Rendered from chart/kms-core with:
+#   helm template kms-core-2 chart/kms-core -n kms-threshold-staging --include-crds \
+#     -f ../scratchbook/k8s-minimization/values/overrides.yaml \
+#     -f ../scratchbook/k8s-minimization/values/peers.yaml \
+#     --set kmsPeers.id=2 --set kmsCore.publicVault.s3.prefix=PUB-p2 \
+#     --set kmsCore.privateVault.s3.prefix=PRIV-p2 \
+#     --set kmsCore.enabled=true --set kmsCoreClient.enabled=false --set kmsInit.enabled=false
+#
+# Then minimized for Antithesis: private images repointed at the Antithesis registry,
+# the dangling `registry-credentials` imagePullSecret and the null serviceAccountName
+# dropped, Helm hook annotations replaced with kapp ordering. See
+# antithesis/scratchbook/k8s-minimization/working.md.
+#
+# One behaviour change to the chart's init container `kms-core-init-load-env`: it
+# retries the peer CA certificate fetch until it has all four (up to 600 s, then it
+# exits non-zero), instead of writing an empty certificate into kms-server.toml when
+# MinIO does not answer. See the comment in the script.
+#
+# `kms-core-2-core-2` is load-bearing: it is the pod name, the per-pod Service name,
+# the MPC identity and the TLS subject all at once. Do not rename it.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: kms-core
+    app.kubernetes.io/name: kms-core-2-core
+    headless: 'true'
+  name: kms-core-2-core
+  namespace: kms-threshold-staging
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - name: client
+    port: 50100
+    targetPort: 50100
+  - name: peer
+    port: 50001
+    targetPort: 50001
+  selector:
+    app: kms-core
+    app.kubernetes.io/name: kms-core-2-core
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: kms-core
+    app.kubernetes.io/name: kms-core-2-core
+    headless: 'false'
+  name: kms-core-2-core-2
+  namespace: kms-threshold-staging
+spec:
+  type: ClusterIP
+  ports:
+  - name: client
+    port: 50100
+    targetPort: 50100
+  - name: peer
+    port: 50001
+    targetPort: 50001
+  - name: metrics
+    port: 9646
+    targetPort: 9646
+  selector:
+    app: kms-core
+    app.kubernetes.io/name: kms-core-2-core
+    statefulset.kubernetes.io/pod-name: kms-core-2-core-2
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app: kms-core
+    app.kubernetes.io/name: kms-core-2-core
+  annotations:
+    checksum/config: 1573250d666ce02e49de5c77fa7901ea3fcc9c8349a995a04f5fa19225cd9d40
+    kapp.k14s.io/change-group: kms-core
+    kapp.k14s.io/change-rule: upsert after upserting keys-ready
+  name: kms-core-2-core
+  namespace: kms-threshold-staging
+spec:
+  replicas: 1
+  ordinals:
+    start: 2
+  podManagementPolicy: Parallel
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: kms-core
+  serviceName: kms-core-2-core
+  template:
+    metadata:
+      labels:
+        app: kms-core
+        app.kubernetes.io/name: kms-core-2-core
+      annotations:
+        checksum/config: 1573250d666ce02e49de5c77fa7901ea3fcc9c8349a995a04f5fa19225cd9d40
+    spec:
+      securityContext:
+        fsGroup: 10002
+        runAsGroup: 10002
+        runAsNonRoot: true
+        runAsUser: 10003
+      subdomain: kms-core-2-core
+      initContainers:
+      - image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/init-envsubst:speedrun-3095d82a-fix-decryption-stalls
+        imagePullPolicy: Never
+        name: kms-core-init-load-env
+        command:
+        - /bin/sh
+        args:
+        - -c
+        - |
+          # Fail loudly on any assembly error (e.g. a socat image without
+          # `envsubst`) instead of silently writing empty kms-*.toml and
+          # letting the core/gen-keys start with no config.
+          set -e
+          export AWS_REGION="${AWS_REGION:=eu-west-1}"
+          export AWS_ROLE_ARN="${AWS_ROLE_ARN:=}"
+          export KMS_CORE__PUBLIC_VAULT__STORAGE__S3__BUCKET="${KMS_CORE__PUBLIC_VAULT__STORAGE__S3__BUCKET:=kms-public}"
+          export KMS_CORE__PUBLIC_VAULT__STORAGE__S3__PREFIX="${KMS_CORE__PUBLIC_VAULT__STORAGE__S3__PREFIX:=PUB-p2}"
+          export KMS_CORE__PRIVATE_VAULT__STORAGE__S3__BUCKET="${KMS_CORE__PRIVATE_VAULT__STORAGE__S3__BUCKET:=kms-private}"
+          export KMS_CORE__PRIVATE_VAULT__STORAGE__S3__PREFIX="${KMS_CORE__PRIVATE_VAULT__STORAGE__S3__PREFIX:=PRIV-p2}"
+          # Fetch the CA certificate of every peer (needed for peer verification). Each
+          # party's certificate is at PUB-p<i>/CACert/<signing key id> in MinIO.
+          # Antithesis harness change: the chart's version lists and downloads each one once
+          # with `curl -s` and, if the listing comes back empty, only warns and writes an
+          # empty `tls_cert.pem` into kms-server.toml. kms-server then cannot start, and the
+          # init container never re-runs on a container restart, so the core stays down until
+          # its pod is deleted again. Here every certificate is retried until it is fetched
+          # and is a PEM certificate. After 600 s the container exits non-zero, which shows
+          # up as an init failure and makes kubelet run it again.
+          S3_BASE_URL="${CORE_CLIENT__S3_ENDPOINT}/kms-public"
+          echo "Fetching TLS certificates from S3 base URL: ${S3_BASE_URL}"
+          # fetch_ca N: list PUB-pN/CACert/ and download the certificate to ./ca_pem_N.
+          fetch_ca() {
+            ca_path=$(curl -sf --connect-timeout 5 --max-time 20 "${S3_BASE_URL}?list-type=2&prefix=PUB-p$1/CACert/" | grep -o "<Key>[^<]*</Key>" | sed "s/<Key>//;s/<\/Key>//" | head -n 1)
+            if [ -z "${ca_path}" ]; then
+              echo "No CA cert listed for party $1 yet"
+              return 1
+            fi
+            if ! curl -sf --connect-timeout 5 --max-time 20 -o "./ca_pem_$1.tmp" "${S3_BASE_URL}/${ca_path}"; then
+              echo "Download of ${ca_path} failed"
+              return 1
+            fi
+            if ! grep -q -e "-----BEGIN CERTIFICATE-----" "./ca_pem_$1.tmp"; then
+              echo "${ca_path} is not a PEM certificate"
+              return 1
+            fi
+            mv "./ca_pem_$1.tmp" "./ca_pem_$1"
+            echo "Fetched CA cert for party $1 from ${ca_path}"
+          }
+          # Seconds since boot: unlike the wall clock, it does not jump.
+          uptime_s() { cut -d. -f1 /proc/uptime; }
+          give_up_at=$(( $(uptime_s) + 600 ))
+          missing="1 2 3 4"
+          while true; do
+            still_missing=""
+            for i in ${missing}; do
+              fetch_ca "${i}" || still_missing="${still_missing} ${i}"
+            done
+            missing="${still_missing}"
+            if [ -z "${missing}" ]; then
+              break
+            fi
+            if [ "$(uptime_s)" -ge "${give_up_at}" ]; then
+              echo "ERROR: no CA certificate for parties${missing} after 600 s; exiting non-zero so that kubelet retries" >&2
+              exit 1
+            fi
+            sleep 5
+          done
+          export KMS_CA_PEM_1="\"\"\"$(cat ./ca_pem_1)\"\"\""
+          export KMS_CA_PEM_2="\"\"\"$(cat ./ca_pem_2)\"\"\""
+          export KMS_CA_PEM_3="\"\"\"$(cat ./ca_pem_3)\"\"\""
+          export KMS_CA_PEM_4="\"\"\"$(cat ./ca_pem_4)\"\"\""
+          # Fetch private key only for this party (party 2)
+          # mockEnclave: [threshold.tls.auto] generates its own ephemeral key, nothing to fetch.
+          echo "### BEGIN - env ###"
+          env
+          echo "### END - env ###"
+          envsubst < /var/lib/kms-core/config/kms-server.toml > kms-server.toml
+          envsubst < /var/lib/kms-core/config/aws.toml >> kms-server.toml
+          envsubst < /var/lib/kms-core/config/vaults.toml >> kms-server.toml
+          envsubst < /var/lib/kms-core/config/kms-gen-keys.toml > kms-gen-keys.toml
+          envsubst < /var/lib/kms-core/config/aws.toml >> kms-gen-keys.toml
+          envsubst < /var/lib/kms-core/config/vaults.toml >> kms-gen-keys.toml
+          echo "### BEGIN - kms-server.toml ###"
+          cat kms-server.toml
+          echo "### END - kms-server.toml ###"
+          echo "### BEGIN - kms-gen-keys.toml ###"
+          cat kms-gen-keys.toml
+          echo "### END - kms-gen-keys.toml ###"
+        env:
+        - name: KMS_CORE__THRESHOLD__MY_ID
+          value: '2'
+        - name: NO_COLOR
+          value: 'true'
+        - name: RUN_MODE
+          value: dev
+        - name: RUST_LOG
+          value: info
+        - name: AWS_ACCESS_KEY_ID
+          value: kms-access-key-id
+        - name: AWS_SECRET_ACCESS_KEY
+          value: kms-secret-access-key
+        - name: CORE_CLIENT__S3_ENDPOINT
+          value: http://minio:9000
+        - name: KMS_CORE__PRIVATE_VAULT__STORAGE__S3__BUCKET
+          value: kms-private
+        - name: KMS_CORE__PRIVATE_VAULT__STORAGE__S3__PREFIX
+          value: PRIV-p2
+        - name: KMS_CORE__PUBLIC_VAULT__STORAGE__S3__BUCKET
+          value: kms-public
+        - name: KMS_CORE__PUBLIC_VAULT__STORAGE__S3__PREFIX
+          value: PUB-p2
+        workingDir: /root
+        volumeMounts:
+        - mountPath: /var/lib/kms-core/config
+          name: config-files
+        - mountPath: /root
+          name: workdir
+      - image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-service:speedrun-3095d82a-fix-decryption-stalls
+        imagePullPolicy: Never
+        name: kms-core-init-gen-keys
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+        command:
+        - /bin/sh
+        args:
+        - -c
+        - |
+          env
+          echo "generating keys"
+          kms-gen-keys --config-file kms-gen-keys.toml
+        env:
+        - name: KMS_CORE__THRESHOLD__MY_ID
+          value: '2'
+        - name: NO_COLOR
+          value: 'true'
+        - name: RUN_MODE
+          value: dev
+        - name: RUST_LOG
+          value: info
+        - name: AWS_ACCESS_KEY_ID
+          value: kms-access-key-id
+        - name: AWS_SECRET_ACCESS_KEY
+          value: kms-secret-access-key
+        - name: CORE_CLIENT__S3_ENDPOINT
+          value: http://minio:9000
+        - name: KMS_CORE__PRIVATE_VAULT__STORAGE__S3__BUCKET
+          value: kms-private
+        - name: KMS_CORE__PRIVATE_VAULT__STORAGE__S3__PREFIX
+          value: PRIV-p2
+        - name: KMS_CORE__PUBLIC_VAULT__STORAGE__S3__BUCKET
+          value: kms-public
+        - name: KMS_CORE__PUBLIC_VAULT__STORAGE__S3__PREFIX
+          value: PUB-p2
+        workingDir: /root
+        volumeMounts:
+        - mountPath: /root
+          name: workdir
+      containers:
+      - image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/core-service:speedrun-3095d82a-fix-decryption-stalls
+        imagePullPolicy: Never
+        name: kms-core
+        command:
+        - /bin/sh
+        args:
+        - -c
+        - |
+          mkdir -p ~/.aws/
+          cat > ~/.aws/credentials <<EOF
+          [default]
+          aws_access_key_id=${AWS_ACCESS_KEY_ID}
+          aws_secret_access_key=${AWS_SECRET_ACCESS_KEY}
+          EOF
+          cat ~/.aws/credentials
+          env
+          kms-server --config-file=kms-server.toml
+        env:
+        - name: KMS_CORE__THRESHOLD__MY_ID
+          value: '2'
+        - name: NO_COLOR
+          value: 'true'
+        - name: RUN_MODE
+          value: dev
+        - name: RUST_LOG
+          value: info
+        - name: AWS_ACCESS_KEY_ID
+          value: kms-access-key-id
+        - name: AWS_SECRET_ACCESS_KEY
+          value: kms-secret-access-key
+        - name: AWS_ENDPOINT_URL_S3
+          value: http://minio:9000
+        - name: KMS_CORE__PRIVATE_VAULT__STORAGE__S3__BUCKET
+          value: kms-private
+        - name: KMS_CORE__PRIVATE_VAULT__STORAGE__S3__PREFIX
+          value: PRIV-p2
+        - name: KMS_CORE__PUBLIC_VAULT__STORAGE__S3__BUCKET
+          value: kms-public
+        - name: KMS_CORE__PUBLIC_VAULT__STORAGE__S3__PREFIX
+          value: PUB-p2
+        workingDir: /root
+        volumeMounts:
+        - mountPath: /root
+          name: workdir
+        - mountPath: /var/lib/kms-core/config
+          name: config-files
+        ports:
+        - containerPort: 50100
+          protocol: TCP
+        - containerPort: 50001
+          protocol: TCP
+        - containerPort: 9646
+          protocol: TCP
+        resources:
+          requests:
+            memory: 2Gi
+            cpu: 100m
+          limits:
+            ephemeral-storage: 1Gi
+            memory: 8Gi
+        readinessProbe:
+          grpc:
+            port: 50100
+            service: readiness
+          failureThreshold: 30
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        startupProbe:
+          grpc:
+            port: 50100
+            service: readiness
+          failureThreshold: 60
+          initialDelaySeconds: 0
+          periodSeconds: 10
+          timeoutSeconds: 5
+        livenessProbe:
+          grpc:
+            port: 50100
+            service: liveness
+          failureThreshold: 10
+          initialDelaySeconds: 10
+          timeoutSeconds: 5
+      restartPolicy: Always
+      volumes:
+      - name: workdir
+        emptyDir: {}
+      - name: config-files
+        configMap:
+          name: kms-core-2-core-config
+          defaultMode: 436
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app: kms-core
+    app.kubernetes.io/name: kms-core-2-core
+  name: kms-core-2-core-config
+  namespace: kms-threshold-staging
+data:
+  aws.toml: |
+    [aws]
+    region = "${AWS_REGION}"
+    s3_endpoint = "http://minio:9000"
+  vaults.toml: |
+    [public_vault.storage.s3]
+    bucket = "${KMS_CORE__PUBLIC_VAULT__STORAGE__S3__BUCKET}"
+    prefix = "${KMS_CORE__PUBLIC_VAULT__STORAGE__S3__PREFIX}"
+    [private_vault.storage.s3]
+    bucket = "${KMS_CORE__PRIVATE_VAULT__STORAGE__S3__BUCKET}"
+    prefix = "${KMS_CORE__PRIVATE_VAULT__STORAGE__S3__PREFIX}"
+  kms-gen-keys.toml: |
+    [keygen]
+    [threshold]
+    my_id = "${KMS_CORE__THRESHOLD__MY_ID}"
+    tls_subject = "kms-core-2-core-2"
+  kms-server.toml: |
+    mock_enclave = true
+    [service]
+    listen_address = "0.0.0.0"
+    listen_port = 50100
+    timeout_secs = 360
+    grpc_max_message_size = 104857600
+
+
+    [threshold]
+    listen_address = "0.0.0.0"
+    listen_port = 50001
+
+    my_id = "${KMS_CORE__THRESHOLD__MY_ID}"
+
+    # Threshold is the number of corruptions that the protocol handles.
+    threshold = 1
+    dec_capacity = 10000
+    min_dec_cache = 6000
+    num_sessions_preproc = 2
+    decryption_mode = "NoiseFloodSmall"
+
+    [threshold.core_to_core_net]
+    message_limit = 70
+    multiplier = 2
+    max_interval = 60
+    max_elapsed_time = 300
+    network_timeout = 300
+    network_timeout_bk = 300
+    network_timeout_bk_sns = 1200
+    max_en_decode_message_size = 2147483648
+    initial_interval_ms = 100
+    session_update_interval_secs = 60
+    session_cleanup_interval_secs = 86400
+    discard_inactive_sessions_interval = 900
+    max_waiting_time_for_message_queue = 60
+    max_opened_inactive_sessions_per_party = 1000
+    [threshold.tls.auto]
+    attest_private_vault_root_key = false
+    trusted_releases = []
+    [[threshold.peers]]
+    party_id = 1
+    mpc_identity = "kms-core-1-core-1"
+    address = "kms-core-1-core-1"
+    port = 50001
+    tls_cert.pem = ${KMS_CA_PEM_1}
+    [[threshold.peers]]
+    party_id = 2
+    mpc_identity = "kms-core-2-core-2"
+    address = "kms-core-2-core-2"
+    port = 50001
+    tls_cert.pem = ${KMS_CA_PEM_2}
+    [[threshold.peers]]
+    party_id = 3
+    mpc_identity = "kms-core-3-core-3"
+    address = "kms-core-3-core-3"
+    port = 50001
+    tls_cert.pem = ${KMS_CA_PEM_3}
+    [[threshold.peers]]
+    party_id = 4
+    mpc_identity = "kms-core-4-core-4"
+    address = "kms-core-4-core-4"
+    port = 50001
+    tls_cert.pem = ${KMS_CA_PEM_4}
+
+
+
+    [telemetry]
+    tracing_service_name = "kms-core-2-core"
+
+    tracing_otlp_timeout_ms = 10000
+    metrics_bind_address = "0.0.0.0:9646"
+    enable_sys_metrics = true
+    refresh_interval_ms = 5000
+
+    [telemetry.batch]
+    max_queue_size = 8192
+    max_export_batch_size = 2048
+    max_concurrent_exports = 4
+    scheduled_delay_ms = 500
+    export_timeout_ms = 5000
+
+    [rate_limiter_conf]
+    bucket_size = 51000
+    pub_decrypt = 1
+    user_decrypt = 1
+    crsgen = 100
+    preproc = 50000
+    keygen = 1000
+    new_epoch = 25
+
+    [internal_config]
+    num_rayon_threads = 8
+    num_tokio_threads = 2

@@ -1,0 +1,203 @@
+make: Entering directory '/home/exedev/kms/antithesis'
+/home/exedev/kms/antithesis/config/render.sh
+Rendered /home/exedev/kms/antithesis/build/config with tag speedrun-3095d82a
+kapp deploy -a kms -f /home/exedev/kms/antithesis/build/config/manifests --yes
+Target cluster 'https://127.0.0.1:6443' (nodes: ashvin-zama-kms)
+
+Changes
+
+Namespace              Name                          Kind                   Age  Op      Op st.  Wait to    Rs  Ri  
+(cluster)              kms-threshold-staging         Namespace              -    create  -       reconcile  -   -  
+kms-threshold-staging  kms-core-1-core               Service                -    create  -       reconcile  -   -  
+^                      kms-core-1-core               StatefulSet            -    create  -       reconcile  -   -  
+^                      kms-core-1-core-1             Service                -    create  -       reconcile  -   -  
+^                      kms-core-1-core-config        ConfigMap              -    create  -       reconcile  -   -  
+^                      kms-core-2-core               Service                -    create  -       reconcile  -   -  
+^                      kms-core-2-core               StatefulSet            -    create  -       reconcile  -   -  
+^                      kms-core-2-core-2             Service                -    create  -       reconcile  -   -  
+^                      kms-core-2-core-config        ConfigMap              -    create  -       reconcile  -   -  
+^                      kms-core-3-core               Service                -    create  -       reconcile  -   -  
+^                      kms-core-3-core               StatefulSet            -    create  -       reconcile  -   -  
+^                      kms-core-3-core-3             Service                -    create  -       reconcile  -   -  
+^                      kms-core-3-core-config        ConfigMap              -    create  -       reconcile  -   -  
+^                      kms-core-4-core               Service                -    create  -       reconcile  -   -  
+^                      kms-core-4-core               StatefulSet            -    create  -       reconcile  -   -  
+^                      kms-core-4-core-4             Service                -    create  -       reconcile  -   -  
+^                      kms-core-4-core-config        ConfigMap              -    create  -       reconcile  -   -  
+^                      kms-core-client               StatefulSet            -    create  -       reconcile  -   -  
+^                      kms-core-client-config        ConfigMap              -    create  -       reconcile  -   -  
+^                      kms-core-init-threshold-init  Job                    -    create  -       reconcile  -   -  
+^                      kms-prepopulate-keys          Job                    -    create  -       reconcile  -   -  
+^                      kms-workload-tests            ConfigMap              -    create  -       reconcile  -   -  
+^                      minio                         Deployment             -    create  -       reconcile  -   -  
+^                      minio                         Service                -    create  -       reconcile  -   -  
+^                      minio-data                    PersistentVolumeClaim  -    create  -       reconcile  -   -  
+^                      minio-provision               Job                    -    create  -       reconcile  -   -  
+
+Op:      26 create, 0 delete, 0 update, 0 noop, 0 exists
+Wait to: 26 reconcile, 0 delete, 0 noop
+
+8:38:17PM: ---- applying 1 changes [0/26 done] ----
+8:38:17PM: create namespace/kms-threshold-staging (v1) cluster
+8:38:17PM: ---- waiting on 1 changes [0/26 done] ----
+8:38:17PM: ok: reconcile namespace/kms-threshold-staging (v1) cluster
+8:38:17PM: ---- applying 7 changes [1/26 done] ----
+8:38:17PM: create configmap/kms-core-2-core-config (v1) namespace: kms-threshold-staging
+8:38:17PM: create configmap/kms-core-3-core-config (v1) namespace: kms-threshold-staging
+8:38:17PM: create persistentvolumeclaim/minio-data (v1) namespace: kms-threshold-staging
+8:38:17PM: create configmap/kms-core-4-core-config (v1) namespace: kms-threshold-staging
+8:38:17PM: create configmap/kms-core-1-core-config (v1) namespace: kms-threshold-staging
+8:38:17PM: create configmap/kms-core-client-config (v1) namespace: kms-threshold-staging
+8:38:17PM: create configmap/kms-workload-tests (v1) namespace: kms-threshold-staging
+8:38:17PM: ---- waiting on 7 changes [1/26 done] ----
+8:38:17PM: ok: reconcile configmap/kms-core-2-core-config (v1) namespace: kms-threshold-staging
+8:38:17PM: ok: reconcile configmap/kms-core-1-core-config (v1) namespace: kms-threshold-staging
+8:38:17PM: ok: reconcile persistentvolumeclaim/minio-data (v1) namespace: kms-threshold-staging
+8:38:17PM: ok: reconcile configmap/kms-core-3-core-config (v1) namespace: kms-threshold-staging
+8:38:17PM: ok: reconcile configmap/kms-core-4-core-config (v1) namespace: kms-threshold-staging
+8:38:17PM: ok: reconcile configmap/kms-core-client-config (v1) namespace: kms-threshold-staging
+8:38:17PM: ok: reconcile configmap/kms-workload-tests (v1) namespace: kms-threshold-staging
+8:38:17PM: ---- applying 10 changes [8/26 done] ----
+8:38:17PM: create deployment/minio (apps/v1) namespace: kms-threshold-staging
+8:38:17PM: create service/kms-core-1-core-1 (v1) namespace: kms-threshold-staging
+8:38:17PM: create service/kms-core-4-core-4 (v1) namespace: kms-threshold-staging
+8:38:17PM: create service/minio (v1) namespace: kms-threshold-staging
+8:38:17PM: create service/kms-core-2-core (v1) namespace: kms-threshold-staging
+8:38:17PM: create service/kms-core-3-core-3 (v1) namespace: kms-threshold-staging
+8:38:17PM: create service/kms-core-2-core-2 (v1) namespace: kms-threshold-staging
+8:38:17PM: create service/kms-core-3-core (v1) namespace: kms-threshold-staging
+8:38:17PM: create service/kms-core-4-core (v1) namespace: kms-threshold-staging
+8:38:17PM: create service/kms-core-1-core (v1) namespace: kms-threshold-staging
+8:38:17PM: ---- waiting on 10 changes [8/26 done] ----
+8:38:17PM: ok: reconcile service/kms-core-2-core (v1) namespace: kms-threshold-staging
+8:38:17PM: ok: reconcile service/kms-core-3-core-3 (v1) namespace: kms-threshold-staging
+8:38:17PM: ok: reconcile service/kms-core-2-core-2 (v1) namespace: kms-threshold-staging
+8:38:17PM: ok: reconcile service/kms-core-1-core (v1) namespace: kms-threshold-staging
+8:38:17PM: ok: reconcile service/kms-core-3-core (v1) namespace: kms-threshold-staging
+8:38:17PM: ok: reconcile service/kms-core-4-core-4 (v1) namespace: kms-threshold-staging
+8:38:17PM: ok: reconcile service/kms-core-1-core-1 (v1) namespace: kms-threshold-staging
+8:38:17PM: ok: reconcile service/kms-core-4-core (v1) namespace: kms-threshold-staging
+8:38:17PM: ok: reconcile service/minio (v1) namespace: kms-threshold-staging
+8:38:17PM: ongoing: reconcile deployment/minio (apps/v1) namespace: kms-threshold-staging
+8:38:17PM:  ^ Waiting for generation 2 to be observed
+8:38:17PM:  L ok: waiting on replicaset/minio-6895946fb7 (apps/v1) namespace: kms-threshold-staging
+8:38:17PM:  L ongoing: waiting on pod/minio-6895946fb7-lx9r4 (v1) namespace: kms-threshold-staging
+8:38:17PM:     ^ Pending
+8:38:17PM: ---- waiting on 1 changes [17/26 done] ----
+8:38:17PM: ongoing: reconcile deployment/minio (apps/v1) namespace: kms-threshold-staging
+8:38:17PM:  ^ Waiting for 1 unavailable replicas
+8:38:17PM:  L ok: waiting on replicaset/minio-6895946fb7 (apps/v1) namespace: kms-threshold-staging
+8:38:17PM:  L ongoing: waiting on pod/minio-6895946fb7-lx9r4 (v1) namespace: kms-threshold-staging
+8:38:17PM:     ^ Pending
+8:38:23PM: ongoing: reconcile deployment/minio (apps/v1) namespace: kms-threshold-staging
+8:38:23PM:  ^ Waiting for 1 unavailable replicas
+8:38:23PM:  L ok: waiting on replicaset/minio-6895946fb7 (apps/v1) namespace: kms-threshold-staging
+8:38:23PM:  L ongoing: waiting on pod/minio-6895946fb7-lx9r4 (v1) namespace: kms-threshold-staging
+8:38:23PM:     ^ Condition Ready is not True (False)
+8:38:26PM: ok: reconcile deployment/minio (apps/v1) namespace: kms-threshold-staging
+8:38:26PM: ---- applying 1 changes [18/26 done] ----
+8:38:26PM: create job/minio-provision (batch/v1) namespace: kms-threshold-staging
+8:38:26PM: ---- waiting on 1 changes [18/26 done] ----
+8:38:26PM: ongoing: reconcile job/minio-provision (batch/v1) namespace: kms-threshold-staging
+8:38:26PM:  ^ Waiting to complete (0 active, 0 failed, 0 succeeded)
+8:38:26PM:  L ongoing: waiting on pod/minio-provision-lkldw (v1) namespace: kms-threshold-staging
+8:38:26PM:     ^ Pending
+8:38:29PM: ongoing: reconcile job/minio-provision (batch/v1) namespace: kms-threshold-staging
+8:38:29PM:  ^ Waiting to complete (1 active, 0 failed, 0 succeeded)
+8:38:29PM:  L ongoing: waiting on pod/minio-provision-lkldw (v1) namespace: kms-threshold-staging
+8:38:29PM:     ^ Condition Ready is not True (False)
+8:38:32PM: ok: reconcile job/minio-provision (batch/v1) namespace: kms-threshold-staging
+8:38:32PM:  ^ Completed
+8:38:32PM: ---- applying 1 changes [19/26 done] ----
+8:38:34PM: create job/kms-prepopulate-keys (batch/v1) namespace: kms-threshold-staging
+8:38:34PM: ---- waiting on 1 changes [19/26 done] ----
+8:38:34PM: ongoing: reconcile job/kms-prepopulate-keys (batch/v1) namespace: kms-threshold-staging
+8:38:34PM:  ^ Waiting to complete (1 active, 0 failed, 0 succeeded)
+8:38:34PM:  L ok: waiting on pod/kms-prepopulate-keys-xqbgh (v1) namespace: kms-threshold-staging
+8:38:40PM: ok: reconcile job/kms-prepopulate-keys (batch/v1) namespace: kms-threshold-staging
+8:38:40PM:  ^ Completed
+8:38:40PM: ---- applying 4 changes [20/26 done] ----
+8:38:40PM: create statefulset/kms-core-1-core (apps/v1) namespace: kms-threshold-staging
+8:38:40PM: create statefulset/kms-core-3-core (apps/v1) namespace: kms-threshold-staging
+8:38:40PM: create statefulset/kms-core-4-core (apps/v1) namespace: kms-threshold-staging
+8:38:40PM: create statefulset/kms-core-2-core (apps/v1) namespace: kms-threshold-staging
+8:38:40PM: ---- waiting on 4 changes [20/26 done] ----
+8:38:40PM: ongoing: reconcile statefulset/kms-core-4-core (apps/v1) namespace: kms-threshold-staging
+8:38:40PM:  ^ Waiting for generation 1 to be observed
+8:38:40PM:  L ongoing: waiting on pod/kms-core-4-core-4 (v1) namespace: kms-threshold-staging
+8:38:40PM:     ^ Pending
+8:38:40PM: ongoing: reconcile statefulset/kms-core-2-core (apps/v1) namespace: kms-threshold-staging
+8:38:40PM:  ^ Waiting for generation 1 to be observed
+8:38:40PM:  L ongoing: waiting on pod/kms-core-2-core-2 (v1) namespace: kms-threshold-staging
+8:38:40PM:     ^ Pending
+8:38:40PM: ongoing: reconcile statefulset/kms-core-3-core (apps/v1) namespace: kms-threshold-staging
+8:38:40PM:  ^ Waiting for generation 1 to be observed
+8:38:40PM:  L ongoing: waiting on pod/kms-core-3-core-3 (v1) namespace: kms-threshold-staging
+8:38:40PM:     ^ Pending
+8:38:40PM: ongoing: reconcile statefulset/kms-core-1-core (apps/v1) namespace: kms-threshold-staging
+8:38:40PM:  ^ Waiting for generation 1 to be observed
+8:38:40PM:  L ongoing: waiting on pod/kms-core-1-core-1 (v1) namespace: kms-threshold-staging
+8:38:40PM:     ^ Pending
+8:38:43PM: ongoing: reconcile statefulset/kms-core-2-core (apps/v1) namespace: kms-threshold-staging
+8:38:43PM:  ^ Waiting for 1 replicas to be ready
+8:38:43PM:  L ongoing: waiting on pod/kms-core-2-core-2 (v1) namespace: kms-threshold-staging
+8:38:43PM:     ^ Pending: PodInitializing
+8:38:43PM: ongoing: reconcile statefulset/kms-core-1-core (apps/v1) namespace: kms-threshold-staging
+8:38:43PM:  ^ Waiting for 1 replicas to be ready
+8:38:43PM:  L ongoing: waiting on pod/kms-core-1-core-1 (v1) namespace: kms-threshold-staging
+8:38:43PM:     ^ Pending: PodInitializing
+8:38:43PM: ongoing: reconcile statefulset/kms-core-3-core (apps/v1) namespace: kms-threshold-staging
+8:38:43PM:  ^ Waiting for 1 replicas to be ready
+8:38:43PM:  L ongoing: waiting on pod/kms-core-3-core-3 (v1) namespace: kms-threshold-staging
+8:38:43PM:     ^ Pending: PodInitializing
+8:38:43PM: ongoing: reconcile statefulset/kms-core-4-core (apps/v1) namespace: kms-threshold-staging
+8:38:43PM:  ^ Waiting for 1 replicas to be ready
+8:38:43PM:  L ongoing: waiting on pod/kms-core-4-core-4 (v1) namespace: kms-threshold-staging
+8:38:43PM:     ^ Pending: PodInitializing
+8:38:46PM: ongoing: reconcile statefulset/kms-core-2-core (apps/v1) namespace: kms-threshold-staging
+8:38:46PM:  ^ Waiting for 1 replicas to be ready
+8:38:46PM:  L ongoing: waiting on pod/kms-core-2-core-2 (v1) namespace: kms-threshold-staging
+8:38:46PM:     ^ Condition Ready is not True (False)
+8:38:46PM: ongoing: reconcile statefulset/kms-core-4-core (apps/v1) namespace: kms-threshold-staging
+8:38:46PM:  ^ Waiting for 1 replicas to be ready
+8:38:46PM:  L ongoing: waiting on pod/kms-core-4-core-4 (v1) namespace: kms-threshold-staging
+8:38:46PM:     ^ Condition Ready is not True (False)
+8:38:46PM: ongoing: reconcile statefulset/kms-core-1-core (apps/v1) namespace: kms-threshold-staging
+8:38:46PM:  ^ Waiting for 1 replicas to be ready
+8:38:46PM:  L ongoing: waiting on pod/kms-core-1-core-1 (v1) namespace: kms-threshold-staging
+8:38:46PM:     ^ Condition Ready is not True (False)
+8:38:46PM: ongoing: reconcile statefulset/kms-core-3-core (apps/v1) namespace: kms-threshold-staging
+8:38:46PM:  ^ Waiting for 1 replicas to be ready
+8:38:46PM:  L ongoing: waiting on pod/kms-core-3-core-3 (v1) namespace: kms-threshold-staging
+8:38:46PM:     ^ Condition Ready is not True (False)
+8:38:58PM: ok: reconcile statefulset/kms-core-4-core (apps/v1) namespace: kms-threshold-staging
+8:38:58PM: ok: reconcile statefulset/kms-core-3-core (apps/v1) namespace: kms-threshold-staging
+8:38:58PM: ok: reconcile statefulset/kms-core-2-core (apps/v1) namespace: kms-threshold-staging
+8:38:58PM: ok: reconcile statefulset/kms-core-1-core (apps/v1) namespace: kms-threshold-staging
+8:38:58PM: ---- applying 2 changes [24/26 done] ----
+8:38:58PM: create statefulset/kms-core-client (apps/v1) namespace: kms-threshold-staging
+8:38:58PM: create job/kms-core-init-threshold-init (batch/v1) namespace: kms-threshold-staging
+8:38:58PM: ---- waiting on 2 changes [24/26 done] ----
+8:38:58PM: ongoing: reconcile job/kms-core-init-threshold-init (batch/v1) namespace: kms-threshold-staging
+8:38:58PM:  ^ Waiting to complete (0 active, 0 failed, 0 succeeded)
+8:38:58PM:  L ongoing: waiting on pod/kms-core-init-threshold-init-r6clr (v1) namespace: kms-threshold-staging
+8:38:58PM:     ^ Pending
+8:38:58PM: ongoing: reconcile statefulset/kms-core-client (apps/v1) namespace: kms-threshold-staging
+8:38:58PM:  ^ Waiting for generation 1 to be observed
+8:38:58PM:  L ongoing: waiting on pod/kms-core-client-0 (v1) namespace: kms-threshold-staging
+8:38:58PM:     ^ Pending
+8:39:01PM: ongoing: reconcile job/kms-core-init-threshold-init (batch/v1) namespace: kms-threshold-staging
+8:39:01PM:  ^ Waiting to complete (1 active, 0 failed, 0 succeeded)
+8:39:01PM:  L ongoing: waiting on pod/kms-core-init-threshold-init-r6clr (v1) namespace: kms-threshold-staging
+8:39:01PM:     ^ Condition Ready is not True (False)
+8:39:01PM: ok: reconcile statefulset/kms-core-client (apps/v1) namespace: kms-threshold-staging
+8:39:01PM: ---- waiting on 1 changes [25/26 done] ----
+8:39:04PM: ok: reconcile job/kms-core-init-threshold-init (batch/v1) namespace: kms-threshold-staging
+8:39:04PM:  ^ Completed
+8:39:04PM: ---- applying complete [26/26 done] ----
+8:39:04PM: ---- waiting complete [26/26 done] ----
+
+Succeeded
+make: Leaving directory '/home/exedev/kms/antithesis'
+exit 0
+Sat Oct 17 20:39:04 UTC 2026

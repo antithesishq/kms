@@ -184,7 +184,9 @@ trap cleanup EXIT
 check() {  # <image> <bin dir> <binary>...
     local image="$1" dir="$2" cid bin s
     shift 2
-    cid="$("${ENGINE}" create "${image}")"
+    # docker refuses to create a container from an image with no CMD (core-client has none);
+    # the command is never run, the container only exists so its files can be copied out.
+    cid="$("${ENGINE}" create "${image}" true)"
     cids+=("${cid}")
     for bin in "$@"; do
         "${ENGINE}" cp "${cid}:${dir}/${bin}" "${tmp}/${bin}"

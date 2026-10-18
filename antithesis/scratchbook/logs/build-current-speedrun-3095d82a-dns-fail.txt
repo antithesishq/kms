@@ -1,0 +1,98 @@
+engine: docker
+tag: speedrun-3095d82a
+kms source: /home/exedev/kms
+rust toolchain: 1.98.1 (from rust-toolchain.toml)
+
+=== zama-golden: Zama's rust-golden-image (docker/base/Dockerfile) ===
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.53kB done
+#1 DONE 0.0s
+
+#2 [context cgr.dev/zama.ai/glibc-dynamic:16-dev] load metadata for cgr.dev/chainguard/glibc-dynamic:latest-dev
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 372B done
+#3 DONE 0.0s
+
+#4 [context cgr.dev/zama.ai/glibc-dynamic:16-dev] cgr.dev/chainguard/glibc-dynamic:latest-dev
+#4 resolve cgr.dev/chainguard/glibc-dynamic:latest-dev 0.1s done
+#4 CACHED
+
+#5 [prod 1/4] RUN --mount=type=cache,target=/var/cache/apk,sharing=locked     --mount=type=cache,target=/var/lib/apk,sharing=locked     apk add --no-cache     curl     wget     bash     git     make     perl     binutils     gcc     libstdc++     linux-headers     build-base     openssl-dev     protoc     protobuf
+#5 0.230 fetch https://apk.cgr.dev/chainguard/x86_64/APKINDEX.tar.gz
+#5 1.385 (1/28) Installing libzstd1 (1.5.7-r10)
+#5 1.589 (2/28) Installing binutils (2.47-r1)
+#5 2.255 (3/28) Installing libxcrypt-dev (4.5.2-r6)
+#5 2.426 (4/28) Installing linux-headers (7.2.11-r0)
+#5 29.49 (5/28) Installing glibc-2.44-dev (2.44-r8)
+#5 30.03 (6/28) Installing libquadmath (16.2.0-r1)
+#5 30.16 (7/28) Installing libstdc++-dev (16.2.0-r1)
+#5 30.75 (8/28) Installing openssf-compiler-options (20250904-r11)
+#5 30.92 (9/28) Installing posix-cc-wrappers (2-r10)
+#5 31.09 (10/28) Installing libatomic (16.2.0-r1)
+#5 31.19 (11/28) Installing gmp (6.3.0-r10)
+#5 31.42 (12/28) Installing libgomp (16.2.0-r1)
+#5 31.59 (13/28) Installing isl (0.28-r4)
+#5 31.76 (14/28) Installing mpfr (4.2.2-r3)
+#5 31.89 (15/28) Installing mpc (1.4.1-r1)
+#5 32.05 (16/28) Installing gcc (16.2.0-r1)
+#5 34.71 (17/28) Installing make (4.4.1-r15)
+#5 34.88 (18/28) Installing pkgconf (3.0.9-r0)
+#5 35.06 (19/28) Installing build-base (1-r10)
+#5 35.19 (20/28) Installing curl (8.23.0-r0)
+#5 35.31 (21/28) Installing openssl-4.0-dev (4.0.3-r7)
+#5 35.92 (22/28) Installing libbz2-1 (1.0.8-r25)
+#5 36.06 (23/28) Installing perl (5.44.0-r1)
+#5 36.53 (24/28) Installing libabsl2608.0.0 (20260817.0-r4)
+#5 36.71 (25/28) Installing libprotoc36.2.0 (36.2-r0)
+#5 36.99 (26/28) Installing libprotobuf36.2.0 (36.2-r0)
+#5 37.19 (27/28) Installing protobuf (36.2-r0)
+#5 37.39 (28/28) Installing protoc (36.2-r0)
+#5 37.54 Executing busybox-1.38.0-r3.trigger
+#5 37.57 OK: 655 MiB in 71 packages
+#5 DONE 38.7s
+
+#6 [prod 2/4] RUN set -eux;     arch="$(uname -m)";     case "$arch" in         x86_64)  triple=x86_64-unknown-linux-musl ;;         aarch64) triple=aarch64-unknown-linux-musl ;;         *) echo "unsupported arch: $arch" >&2; exit 1 ;;     esac;     curl -fsSL "https://github.com/mozilla/sccache/releases/download/v0.15.0/sccache-v0.15.0-${triple}.tar.gz"         | tar -xz --strip-components=1 -C /usr/local/bin "sccache-v0.15.0-${triple}/sccache";     chmod +x /usr/local/bin/sccache;     sccache --version
+#6 0.265 + uname -m
+#6 0.266 + arch=x86_64
+#6 0.266 + triple=x86_64-unknown-linux-musl
+#6 0.266 + curl -fsSL https://github.com/mozilla/sccache/releases/download/v0.15.0/sccache-v0.15.0-x86_64-unknown-linux-musl.tar.gz
+#6 0.266 + tar -xz '--strip-components=1' -C /usr/local/bin sccache-v0.15.0-x86_64-unknown-linux-musl/sccache
+#6 10.28 curl: (6) Could not resolve host: github.com
+#6 10.28 tar: invalid magic
+#6 10.28 tar: short read
+#6 10.28 tar: sccache-v0.15.0-x86_64-unknown-linux-musl/sccache: not found in archive
+#6 ERROR: process "/bin/sh -c set -eux;     arch=\"$(uname -m)\";     case \"$arch\" in         x86_64)  triple=x86_64-unknown-linux-musl ;;         aarch64) triple=aarch64-unknown-linux-musl ;;         *) echo \"unsupported arch: $arch\" >&2; exit 1 ;;     esac;     curl -fsSL \"https://github.com/mozilla/sccache/releases/download/${SCCACHE_VERSION}/sccache-${SCCACHE_VERSION}-${triple}.tar.gz\"         | tar -xz --strip-components=1 -C /usr/local/bin \"sccache-${SCCACHE_VERSION}-${triple}/sccache\";     chmod +x /usr/local/bin/sccache;     sccache --version" did not complete successfully: exit code: 1
+------
+ > [prod 2/4] RUN set -eux;     arch="$(uname -m)";     case "$arch" in         x86_64)  triple=x86_64-unknown-linux-musl ;;         aarch64) triple=aarch64-unknown-linux-musl ;;         *) echo "unsupported arch: $arch" >&2; exit 1 ;;     esac;     curl -fsSL "https://github.com/mozilla/sccache/releases/download/v0.15.0/sccache-v0.15.0-${triple}.tar.gz"         | tar -xz --strip-components=1 -C /usr/local/bin "sccache-v0.15.0-${triple}/sccache";     chmod +x /usr/local/bin/sccache;     sccache --version:
+0.265 + uname -m
+0.266 + arch=x86_64
+0.266 + triple=x86_64-unknown-linux-musl
+0.266 + curl -fsSL https://github.com/mozilla/sccache/releases/download/v0.15.0/sccache-v0.15.0-x86_64-unknown-linux-musl.tar.gz
+0.266 + tar -xz '--strip-components=1' -C /usr/local/bin sccache-v0.15.0-x86_64-unknown-linux-musl/sccache
+10.28 curl: (6) Could not resolve host: github.com
+10.28 tar: invalid magic
+10.28 tar: short read
+10.28 tar: sccache-v0.15.0-x86_64-unknown-linux-musl/sccache: not found in archive
+------
+Dockerfile:27
+--------------------
+  26 |     
+  27 | >>> RUN set -eux; \
+  28 | >>>     arch="$(uname -m)"; \
+  29 | >>>     case "$arch" in \
+  30 | >>>         x86_64)  triple=x86_64-unknown-linux-musl ;; \
+  31 | >>>         aarch64) triple=aarch64-unknown-linux-musl ;; \
+  32 | >>>         *) echo "unsupported arch: $arch" >&2; exit 1 ;; \
+  33 | >>>     esac; \
+  34 | >>>     curl -fsSL "https://github.com/mozilla/sccache/releases/download/${SCCACHE_VERSION}/sccache-${SCCACHE_VERSION}-${triple}.tar.gz" \
+  35 | >>>         | tar -xz --strip-components=1 -C /usr/local/bin "sccache-${SCCACHE_VERSION}-${triple}/sccache"; \
+  36 | >>>     chmod +x /usr/local/bin/sccache; \
+  37 | >>>     sccache --version
+  38 |     
+--------------------
+ERROR: failed to build: failed to solve: process "/bin/sh -c set -eux;     arch=\"$(uname -m)\";     case \"$arch\" in         x86_64)  triple=x86_64-unknown-linux-musl ;;         aarch64) triple=aarch64-unknown-linux-musl ;;         *) echo \"unsupported arch: $arch\" >&2; exit 1 ;;     esac;     curl -fsSL \"https://github.com/mozilla/sccache/releases/download/${SCCACHE_VERSION}/sccache-${SCCACHE_VERSION}-${triple}.tar.gz\"         | tar -xz --strip-components=1 -C /usr/local/bin \"sccache-${SCCACHE_VERSION}-${triple}/sccache\";     chmod +x /usr/local/bin/sccache;     sccache --version" did not complete successfully: exit code: 1
+build exit=1

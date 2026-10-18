@@ -1,0 +1,30 @@
+Building config image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/snouty-config:20261018-081155-6b0d
+Pushing config image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/snouty-config:20261018-081155-6b0d
+Config image pushed successfully: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/snouty-config@sha256:13ac72fc4e2f5bea4952c52b87bc6d569067ceb326dd1a7c494836bdc312f8e1
+
+Requesting Antithesis test run with params:
+{
+  "antithesis.test_name": "speedrun/zama-kms/kms@3095d82a",
+  "antithesis.description": "speedrun hunt current #6: level 3 plus timing fuzzing on a 16 GiB machine, 125 m, turbo: does the Guarantee 2 failure seen under timing fuzzing reproduce with memory pressure removed",
+  "antithesis.duration": "125",
+  "antithesis.source": "speedrun",
+  "antithesis.config_image": "snouty-config@sha256:13ac72fc4e2f5bea4952c52b87bc6d569067ceb326dd1a7c494836bdc312f8e1",
+  "attrs.tool": "speedrun",
+  "attrs.customer": "zama-kms",
+  "attrs.system": "kms",
+  "attrs.purpose": "hunt",
+  "attrs.build": "current",
+  "attrs.ref": "3095d82a",
+  "antithesis.performance_tier": "turbo",
+  "custom.enabled_faults": "network,pod_stop,pod_kill,clock_jitter",
+  "custom.timing_fuzzing": "true",
+  "custom.vm_memory_mb": "16384",
+  "custom.container_faults_stop_exclusion_patterns": "^kms-core-client,^minio-",
+  "custom.container_faults_kill_exclusion_patterns": "^kms-core-client,^minio-",
+  "vcs.repo_branch": "antithesis-poc-speedrun",
+  "vcs.version_id": "3095d82afc277661a2d1629f8d31cc91bf4761f0",
+  "run.caller_type": "snouty"
+}
+{
+  "runId": "9f7fa3b1be496d51e9f1282f511a729c-64-4"
+}

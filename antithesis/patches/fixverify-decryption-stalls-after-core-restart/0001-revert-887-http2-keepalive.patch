@@ -1,0 +1,241 @@
+Revert the production hunks of a51d30be (#887, "detect dead peer connections with HTTP/2 keepalive")
+on current, for the known-bug check. Test-only hunks in sending_service/session.rs are left out.
+
+diff --git a/core/service/src/conf/mod.rs b/core/service/src/conf/mod.rs
+index 8145adf5..37558355 100644
+--- a/core/service/src/conf/mod.rs
++++ b/core/service/src/conf/mod.rs
+@@ -415,32 +415,6 @@ mod tests {
+         assert!(config.validate().is_err());
+     }
+ 
+-    /// `validate()` also checks the core-to-core network settings of a threshold config.
+-    #[test]
+-    fn config_validation_rejects_a_zero_keepalive() {
+-        let config: CoreConfig =
+-            init_conf("config/default_2").expect("default_2 config must parse");
+-        config.validate().expect("default_2 config should validate");
+-
+-        let mut zero_interval = config.clone();
+-        zero_interval
+-            .threshold
+-            .as_mut()
+-            .expect("threshold section required for threshold config")
+-            .core_to_core_net
+-            .keepalive_interval_secs = Some(0);
+-        assert!(zero_interval.validate().is_err());
+-
+-        let mut zero_timeout = config;
+-        zero_timeout
+-            .threshold
+-            .as_mut()
+-            .expect("threshold section required for threshold config")
+-            .core_to_core_net
+-            .keepalive_timeout_secs = Some(0);
+-        assert!(zero_timeout.validate().is_err());
+-    }
+-
+     #[test]
+     fn test_threshold_config() {
+         let core_config: CoreConfig =
+diff --git a/core/service/src/conf/threshold.rs b/core/service/src/conf/threshold.rs
+index 7b3e9621..fb3b5cdf 100644
+--- a/core/service/src/conf/threshold.rs
++++ b/core/service/src/conf/threshold.rs
+@@ -51,7 +51,6 @@ pub struct ThresholdPartyConf {
+     pub peers: Option<Vec<PeerConf>>,
+     // `#[serde(default)]` lets the whole section be omitted from the config file.
+     #[serde(default)]
+-    #[validate(nested)]
+     pub core_to_core_net: CoreToCoreNetworkConfig,
+     pub decryption_mode: DecryptionMode,
+ }
+diff --git a/core/threshold-networking/src/constants.rs b/core/threshold-networking/src/constants.rs
+index b767e700..ee2ea53f 100644
+--- a/core/threshold-networking/src/constants.rs
++++ b/core/threshold-networking/src/constants.rs
+@@ -30,9 +30,7 @@ pub(crate) const MAX_WAITING_TIME_MESSAGE_QUEUE: u64 = 60;
+ pub const MAX_INTERVAL: Duration = Duration::from_secs(60);
+ 
+ /// The default maximum elapsed time before giving up on retrying
+-/// NOTE: MAX_ELAPSED_TIME must be larger than KEEPALIVE_INTERVAL + KEEPALIVE_TIMEOUT,
+-/// to allow recovery
+-pub(crate) const MAX_ELAPSED_TIME: Duration = Duration::from_secs(90);
++pub(crate) const MAX_ELAPSED_TIME: Duration = Duration::from_secs(60);
+ 
+ /// maximum number of seconds that a party waits for a network message during a protocol
+ pub(crate) const NETWORK_TIMEOUT: Duration = Duration::from_secs(5);
+@@ -61,12 +59,3 @@ pub(crate) const MAX_FUTURE_ROUNDS: usize = 16;
+ 
+ /// Hard cap on the number of distinct future-round messages buffered per sender.
+ pub(crate) const MAX_BUFFERED_FUTURE_MSGS: usize = 32;
+-
+-/// Interval between HTTP/2 keepalive pings on the channel to a peer.
+-/// NOTE: KEEPALIVE_INTERVAL + KEEPALIVE_TIMEOUT must be smaller than MAX_ELAPSED_TIME
+-pub(crate) const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(15);
+-
+-/// Time to wait for the reply to a keepalive ping before the connection to a peer closes. The next
+-/// send then connects again, so it reaches a peer that restarted behind the same address.
+-/// NOTE: KEEPALIVE_INTERVAL + KEEPALIVE_TIMEOUT must be smaller than MAX_ELAPSED_TIME
+-pub(crate) const KEEPALIVE_TIMEOUT: Duration = Duration::from_secs(30);
+diff --git a/core/threshold-networking/src/grpc/config.rs b/core/threshold-networking/src/grpc/config.rs
+index 25573dc2..8d427eb4 100644
+--- a/core/threshold-networking/src/grpc/config.rs
++++ b/core/threshold-networking/src/grpc/config.rs
+@@ -1,16 +1,15 @@
+ //! Core-to-core network configuration and its default-resolving accessors.
+ 
+ use crate::constants::{
+-    DISCARD_INACTIVE_SESSION_INTERVAL_SECS, INITIAL_INTERVAL_MS, KEEPALIVE_INTERVAL,
+-    KEEPALIVE_TIMEOUT, MAX_BUFFERED_FUTURE_MSGS, MAX_ELAPSED_TIME, MAX_EN_DECODE_MESSAGE_SIZE,
+-    MAX_FUTURE_ROUNDS, MAX_INTERVAL, MAX_OPENED_INACTIVE_SESSIONS_PER_PARTY,
+-    MAX_WAITING_TIME_MESSAGE_QUEUE, MESSAGE_LIMIT, MULTIPLIER, NETWORK_TIMEOUT_BK,
+-    NETWORK_TIMEOUT_BK_SNS, NETWORK_TIMEOUT_LONG, SESSION_CLEANUP_INTERVAL_SECS,
+-    SESSION_STATUS_UPDATE_INTERVAL_SECS,
++    DISCARD_INACTIVE_SESSION_INTERVAL_SECS, INITIAL_INTERVAL_MS, MAX_BUFFERED_FUTURE_MSGS,
++    MAX_ELAPSED_TIME, MAX_EN_DECODE_MESSAGE_SIZE, MAX_FUTURE_ROUNDS, MAX_INTERVAL,
++    MAX_OPENED_INACTIVE_SESSIONS_PER_PARTY, MAX_WAITING_TIME_MESSAGE_QUEUE, MESSAGE_LIMIT,
++    MULTIPLIER, NETWORK_TIMEOUT_BK, NETWORK_TIMEOUT_BK_SNS, NETWORK_TIMEOUT_LONG,
++    SESSION_CLEANUP_INTERVAL_SECS, SESSION_STATUS_UPDATE_INTERVAL_SECS,
+ };
+ use serde::{Deserialize, Serialize};
+ use tokio::time::Duration;
+-use validator::{Validate, ValidationError};
++use validator::Validate;
+ 
+ /// Network configuration for core-to-core communication.
+ ///
+@@ -25,7 +24,6 @@ use validator::{Validate, ValidationError};
+ /// If minor secrets needs to be added, then ensure fields are annotated with `#[serde(skip_serializing)]` to avoid accidentally diclosing them.
+ #[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, Validate)]
+ #[serde(deny_unknown_fields)]
+-#[validate(schema(function = validate_keepalive_window))]
+ pub struct CoreToCoreNetworkConfig {
+     /// Maximum number of messages that can be buffered in the message queue.
+     #[validate(range(min = 1))]
+@@ -80,31 +78,6 @@ pub struct CoreToCoreNetworkConfig {
+     /// memory against a peer flooding many distinct future round numbers.
+     /// Should be `>= 1` to tolerate any reordering.
+     pub max_buffered_future_msgs: Option<u64>,
+-    /// Interval in seconds between HTTP/2 keepalive pings on the channel to each peer.
+-    #[validate(range(min = 1))]
+-    pub keepalive_interval_secs: Option<u64>,
+-    /// Time in seconds to wait for the reply to a keepalive ping before the connection to a peer
+-    /// closes.
+-    #[validate(range(min = 1))]
+-    pub keepalive_timeout_secs: Option<u64>,
+-}
+-
+-fn validate_keepalive_window(conf: &CoreToCoreNetworkConfig) -> Result<(), ValidationError> {
+-    let keepalive_window = conf
+-        .get_keepalive_interval()
+-        .checked_add(conf.get_keepalive_timeout())
+-        .ok_or_else(|| ValidationError::new("keepalive duration overflow"))?;
+-
+-    if conf
+-        .get_max_elapsed_time()
+-        .is_some_and(|max_elapsed_time| max_elapsed_time > keepalive_window)
+-    {
+-        return Ok(());
+-    }
+-
+-    Err(ValidationError::new(
+-        "max_elapsed_time must be greater than keepalive_interval_secs + keepalive_timeout_secs",
+-    ))
+ }
+ 
+ impl CoreToCoreNetworkConfig {
+@@ -208,67 +181,4 @@ impl CoreToCoreNetworkConfig {
+             .map(|v| v as usize)
+             .unwrap_or(MAX_FUTURE_ROUNDS)
+     }
+-
+-    /// Returns the interval between HTTP/2 keepalive pings on the channel to each peer.
+-    pub fn get_keepalive_interval(&self) -> Duration {
+-        self.keepalive_interval_secs
+-            .map(Duration::from_secs)
+-            .unwrap_or(KEEPALIVE_INTERVAL)
+-    }
+-
+-    /// Returns how long to wait for the reply to a keepalive ping before the connection to a
+-    /// peer closes.
+-    pub fn get_keepalive_timeout(&self) -> Duration {
+-        self.keepalive_timeout_secs
+-            .map(Duration::from_secs)
+-            .unwrap_or(KEEPALIVE_TIMEOUT)
+-    }
+-}
+-
+-#[cfg(test)]
+-mod tests {
+-    use super::*;
+-
+-    #[test]
+-    fn keepalive_uses_defaults_when_unset() {
+-        let conf = CoreToCoreNetworkConfig::default();
+-        assert_eq!(conf.get_keepalive_interval(), KEEPALIVE_INTERVAL);
+-        assert_eq!(conf.get_keepalive_timeout(), KEEPALIVE_TIMEOUT);
+-    }
+-
+-    #[test]
+-    fn keepalive_uses_configured_values() {
+-        let conf = CoreToCoreNetworkConfig {
+-            keepalive_interval_secs: Some(3),
+-            keepalive_timeout_secs: Some(7),
+-            ..Default::default()
+-        };
+-        assert_eq!(conf.get_keepalive_interval(), Duration::from_secs(3));
+-        assert_eq!(conf.get_keepalive_timeout(), Duration::from_secs(7));
+-    }
+-
+-    #[test]
+-    fn keepalive_rejects_zero() {
+-        let conf = CoreToCoreNetworkConfig {
+-            keepalive_interval_secs: Some(0),
+-            keepalive_timeout_secs: Some(0),
+-            ..Default::default()
+-        };
+-        let errors = conf.validate().unwrap_err();
+-        let fields = errors.field_errors();
+-        assert!(fields.contains_key("keepalive_interval_secs"));
+-        assert!(fields.contains_key("keepalive_timeout_secs"));
+-    }
+-
+-    #[test]
+-    fn keepalive_rejects_window_that_exceeds_max_elapsed_time() {
+-        let conf = CoreToCoreNetworkConfig {
+-            max_elapsed_time: Some(4),
+-            keepalive_interval_secs: Some(1),
+-            keepalive_timeout_secs: Some(3),
+-            ..Default::default()
+-        };
+-
+-        assert!(conf.validate().is_err());
+-    }
+ }
+diff --git a/core/threshold-networking/src/sending_service/service.rs b/core/threshold-networking/src/sending_service/service.rs
+index c2aec3e5..39e270ae 100644
+--- a/core/threshold-networking/src/sending_service/service.rs
++++ b/core/threshold-networking/src/sending_service/service.rs
+@@ -162,10 +162,7 @@ impl GrpcSendingService {
+                 // then this should be changed
+                 let endpoint = Channel::builder(endpoint)
+                     .http2_adaptive_window(true)
+-                    .tcp_nodelay(true)
+-                    .http2_keep_alive_interval(self.config.get_keepalive_interval())
+-                    .keep_alive_timeout(self.config.get_keepalive_timeout())
+-                    .keep_alive_while_idle(true);
++                    .tcp_nodelay(true);
+                 // we have to pass a custom TLS connector to
+                 // tonic::transport::Channel to be able to use a custom rustls
+                 // ClientConfig that overrides the certificate verifier for AWS
+@@ -186,9 +183,6 @@ impl GrpcSendingService {
+                 Channel::builder(endpoint)
+                     .http2_adaptive_window(true)
+                     .tcp_nodelay(true)
+-                    .http2_keep_alive_interval(self.config.get_keepalive_interval())
+-                    .keep_alive_timeout(self.config.get_keepalive_timeout())
+-                    .keep_alive_while_idle(true)
+                     .connect_lazy()
+             }
+         };

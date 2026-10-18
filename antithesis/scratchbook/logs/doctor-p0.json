@@ -1,0 +1,70 @@
+{
+  "ok": true,
+  "checks": [
+    {
+      "name": "container_runtime",
+      "status": "ok",
+      "message": "Container runtime: podman detected"
+    },
+    {
+      "name": "docker_compose",
+      "status": "ok",
+      "message": "docker compose: 2.40.3+ds1-0ubuntu1~24.04.1"
+    },
+    {
+      "name": "tenant",
+      "status": "ok",
+      "message": "tenant is set"
+    },
+    {
+      "name": "repository",
+      "status": "ok",
+      "message": "repository is set"
+    },
+    {
+      "name": "api_key",
+      "status": "ok",
+      "message": "API key provided",
+      "notes": [
+        {
+          "level": "note",
+          "text": "read from the [default] profile in /home/exedev/.config/snouty/credentials.toml"
+        }
+      ]
+    },
+    {
+      "name": "api",
+      "status": "ok",
+      "message": "Antithesis API reachable",
+      "notes": [
+        {
+          "level": "note",
+          "text": "latest API version: v1"
+        },
+        {
+          "level": "note",
+          "text": "tenant release version: 64.4"
+        }
+      ]
+    },
+    {
+      "name": "oauth_configured",
+      "status": "warn",
+      "message": "CLI OAuth login is not enabled for this tenant",
+      "notes": [
+        {
+          "level": "note",
+          "text": "request that your tenant administrator enable OAuth login for the CLI"
+        }
+      ]
+    }
+  ],
+  "settings": {
+    "profile": null,
+    "tenant": "zama",
+    "repository": "us-central1-docker.pkg.dev/molten-verve-216720/zama-repository",
+    "https_proxy": null,
+    "container_engine": "auto-detect",
+    "update_channel": "stable"
+  }
+}

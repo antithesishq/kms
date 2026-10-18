@@ -39,6 +39,6 @@ up: config
 down:
 	kapp delete -a kms --yes
 
-# Run the test commands in the client pod: keygen, driver, reshare, driver.
+# Run the test commands in the client pod: keygen, driver, reshare, driver, recovery check.
 test:
 	$(HERE)local/test.sh

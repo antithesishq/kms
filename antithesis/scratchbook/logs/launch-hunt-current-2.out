@@ -1,0 +1,30 @@
+Building config image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/snouty-config:20261018-003012-e2fd
+Pushing config image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/snouty-config:20261018-003012-e2fd
+Config image pushed successfully: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/snouty-config@sha256:358776042732def05377161d33b51ec60fcd3a1558b66ea3416c854a7f49c08c
+
+Requesting Antithesis test run with params:
+{
+  "antithesis.test_name": "speedrun/zama-kms/kms@3095d82a",
+  "antithesis.description": "speedrun hunt current #2: default fault set plus strobing (quiet windows of 60-120 s between chaos), 4 h, turbo",
+  "antithesis.duration": "240",
+  "antithesis.source": "speedrun",
+  "antithesis.config_image": "snouty-config@sha256:358776042732def05377161d33b51ec60fcd3a1558b66ea3416c854a7f49c08c",
+  "attrs.tool": "speedrun",
+  "attrs.customer": "zama-kms",
+  "attrs.system": "kms",
+  "attrs.purpose": "hunt",
+  "attrs.build": "current",
+  "attrs.ref": "3095d82a",
+  "antithesis.performance_tier": "turbo",
+  "custom.enabled_faults": "network,pod_stop,pod_kill,clock_jitter",
+  "custom.strobe_quiet_max_seconds": "120",
+  "custom.strobe_quiet_min_seconds": "60",
+  "custom.container_faults_stop_exclusion_patterns": "^kms-core-client,^minio-",
+  "custom.container_faults_kill_exclusion_patterns": "^kms-core-client,^minio-",
+  "vcs.repo_branch": "antithesis-poc-speedrun",
+  "vcs.version_id": "3095d82afc277661a2d1629f8d31cc91bf4761f0",
+  "run.caller_type": "snouty"
+}
+{
+  "runId": "bbb951cd05081326d83a92e7efdba98c-64-4"
+}
