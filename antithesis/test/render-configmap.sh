@@ -3,7 +3,7 @@
 # mounts that ConfigMap at /opt/antithesis/test/v1/public_decrypt/, so the scripts reach the
 # cluster without a rebuild of the core-client image.
 #
-# Every *.sh file in v1/public_decrypt/ goes into the ConfigMap. A new file also needs its own
+# Every *.py file in v1/public_decrypt/ goes into the ConfigMap. A new file also needs its own
 # subPath mount in ../config/manifests/40-kms-core-init.yaml.
 #
 # Run this after every edit under v1/public_decrypt/, then apply the manifest and restart the
@@ -26,7 +26,7 @@ out="$here/../config/manifests/41-kms-workload-tests.yaml"
   echo "  name: kms-workload-tests"
   echo "  namespace: kms-threshold-staging"
   echo "data:"
-  for path in "$src"/*.sh; do
+  for path in "$src"/*.py; do
     echo "  ${path##*/}: |"
     sed 's/^\(.\)/    \1/' "$path"
   done

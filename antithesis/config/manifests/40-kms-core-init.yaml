@@ -73,17 +73,17 @@ spec:
         # The public_decrypt test template (41-kms-workload-tests.yaml). It is mounted file
         # by file: a directory mount also puts the ConfigMap's ..data entries into the
         # template directory, where Antithesis looks for test commands.
-        - mountPath: /opt/antithesis/test/v1/public_decrypt/helper_lib.sh
-          subPath: helper_lib.sh
+        - mountPath: /opt/antithesis/test/v1/public_decrypt/helper_lib.py
+          subPath: helper_lib.py
           name: workload-tests
-        - mountPath: /opt/antithesis/test/v1/public_decrypt/first_generate_key.sh
-          subPath: first_generate_key.sh
+        - mountPath: /opt/antithesis/test/v1/public_decrypt/first_generate_key.py
+          subPath: first_generate_key.py
           name: workload-tests
-        - mountPath: /opt/antithesis/test/v1/public_decrypt/parallel_driver_public_decrypt.sh
-          subPath: parallel_driver_public_decrypt.sh
+        - mountPath: /opt/antithesis/test/v1/public_decrypt/parallel_driver_public_decrypt.py
+          subPath: parallel_driver_public_decrypt.py
           name: workload-tests
-        - mountPath: /opt/antithesis/test/v1/public_decrypt/anytime_reshare_key.sh
-          subPath: anytime_reshare_key.sh
+        - mountPath: /opt/antithesis/test/v1/public_decrypt/anytime_reshare_key.py
+          subPath: anytime_reshare_key.py
           name: workload-tests
         resources:
           requests:

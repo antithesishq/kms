@@ -50,6 +50,15 @@ Launch and deploy from `build/config/`, never from `config/`.
 
 Each build adds a new tag, so old images stay in podman and in k3s until you remove them.
 
+## Test commands
+
+The test template `test/v1/public_decrypt/` holds Python scripts that use the [Antithesis Python SDK](https://antithesis.com/docs/reference/sdk/python/).
+`images/client.Dockerfile` installs Python and the SDK in the core-client image.
+The scripts reach the client pod from the ConfigMap in `config/manifests/41-kms-workload-tests.yaml`, not from the image, so a script edit needs no image build.
+Antithesis catalogs assertions only in Python files that are part of an image.
+So each command declares the catalog itself at startup (`declare_catalog` in `helper_lib.py`).
+That scan finds only SDK assertion calls with a string literal as the message, so do not put messages in variables.
+
 ## Flow
 
 Antithesis:

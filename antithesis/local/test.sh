@@ -21,10 +21,10 @@ kubectl wait -n "${NS}" --for=condition=Ready "pod/${POD}" --timeout=5m
 
 run() { echo; echo "=== $1 ==="; kubectl exec -n "${NS}" "${POD}" -- "${T}/$1"; }
 
-run first_generate_key.sh
-for _ in $(seq "${DRIVER_RUNS}"); do run parallel_driver_public_decrypt.sh; done
-run anytime_reshare_key.sh
-for _ in $(seq "${DRIVER_RUNS}"); do run parallel_driver_public_decrypt.sh; done
+run first_generate_key.py
+for _ in $(seq "${DRIVER_RUNS}"); do run parallel_driver_public_decrypt.py; done
+run anytime_reshare_key.py
+for _ in $(seq "${DRIVER_RUNS}"); do run parallel_driver_public_decrypt.py; done
 
 echo
 echo "All test commands exited 0."

@@ -89,15 +89,15 @@ would publish it.
 
 | Suggested assertion | Location | Status |
 |---|---|---|
-| `Always(ok, "public decryption response carries the encrypted plaintext")` | workload driver | **partial**: `test/v1/public_decrypt/parallel_driver_public_decrypt.sh` |
+| `Always(ok, "public decryption response carries the encrypted plaintext")` | workload driver | **partial**: `test/v1/public_decrypt/parallel_driver_public_decrypt.py` |
 
 The first workload is a thin wrapper around the stock CLI, which the user chose over the Rust
-driver above. It uses the fallback SDK (JSONL in `$ANTITHESIS_OUTPUT_DIR/sdk.jsonl`).
+driver above. It uses the Antithesis Python SDK, and declares its assertion catalog at runtime.
 
-- **`first_generate_key.sh`** runs `insecure-preproc-key-gen` and `insecure-key-gen` with
+- **`first_generate_key.py`** runs `insecure-preproc-key-gen` and `insecure-key-gen` with
   `Test` params. `KMS_WORKLOAD_KEYGEN=secure` selects the real DKG. It emits
   `Reachable("workload generated an FHE key")`.
-- **`parallel_driver_public_decrypt.sh`** runs one `public-decrypt from-args`. It picks a key
+- **`parallel_driver_public_decrypt.py`** runs one `public-decrypt from-args`. It picks a key
   that party 1 publishes in MinIO, a random type and value, and random `-a`, `--sync`, `-b`,
   `--no-compression` and `--no-precompute-sns` flags.
 - **`Always` = true** when the CLI exits 0. The CLI verified the signatures, agreement and
@@ -112,7 +112,7 @@ driver above. It uses the fallback SDK (JSONL in `$ANTITHESIS_OUTPUT_DIR/sdk.jso
 - **Reach claims:** success with `-a`, success with `--sync`, a batch, server-side SnS, and
   "public decryption attempt ended without a verdict". The last one shows that faults reach the
   workload.
-- **Reshared epochs** (added 2026-10-16). `anytime_reshare_key.sh` reshares the key with
+- **Reshared epochs** (added 2026-10-16). `anytime_reshare_key.py` reshares the key with
   `new-epoch --previous-epoch-params` into a fresh random epoch (`08…`) of the default context.
   The source is the kms-init epoch, or an epoch that an earlier reshare created (a chain).
   - The command records each epoch in `/tmp/kms-workload-state/epochs` in the client container.
@@ -128,7 +128,7 @@ driver above. It uses the fallback SDK (JSONL in `$ANTITHESIS_OUTPUT_DIR/sdk.jso
     reshare as done, but a result names another key or preprocessing ID, or its signature does
     not verify over the published key material. It also emits `Reachable` for a chained reshare
     and for "key reshare attempt ended without a verdict".
-  - Inputs that nothing public records: the preprocessing ID (`first_generate_key.sh` writes it
+  - Inputs that nothing public records: the preprocessing ID (`first_generate_key.py` writes it
     to `/tmp/kms-workload-state/preproc/<key_id>`), and the key digests. The command computes
     each digest from MinIO as `SHAKE-256/32("PDAT_KEY" || object bytes)`, which matches
     `hash_versioned`. This was checked against Python's `shake_256`, not against a live core.

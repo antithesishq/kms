@@ -12,7 +12,9 @@
 # The KMS binaries are built with Antithesis coverage instrumentation by
 # kms-binaries.Dockerfile, a variant of docker/kms-binaries/Dockerfile. Zama's
 # core-service and core-client Dockerfiles package them, unmodified, and
-# symbols.Dockerfile adds a /symbols layer on top of each image.
+# symbols.Dockerfile adds a /symbols layer on top of each image. Before that,
+# client.Dockerfile adds Python and the Antithesis SDK to core-client for the
+# test commands.
 #
 # Zama's Dockerfiles start FROM images in Zama's private Chainguard org.
 # --build-context redirects each of those to the public image of the same name,
@@ -59,6 +61,7 @@ BINARIES_IMAGE="localhost/kms-antithesis/kms-binaries:intermediate"
 ZAMA_CORE_IMAGE="localhost/kms-antithesis/zama-core-service:intermediate"
 ZAMA_PROBE_IMAGE="localhost/kms-antithesis/zama-core-service-probe:intermediate"
 ZAMA_CLIENT_IMAGE="localhost/kms-antithesis/zama-core-client:intermediate"
+CLIENT_PYTHON_IMAGE="localhost/kms-antithesis/core-client-python:intermediate"
 
 CORE_IMAGE="${REG}/kms/core-service:${TAG}"
 PROBE_IMAGE="${REG}/kms/core-service-probe:${TAG}"
@@ -148,6 +151,12 @@ step "core-client (prod, EXPECTED_KMS_FLAVOR=insecure)"
     --build-arg EXPECTED_KMS_FLAVOR=insecure \
     "${KMS_SRC}"
 
+step "core-client-python: core-client + Python and the Antithesis SDK"
+"${ENGINE}" build -t "${CLIENT_PYTHON_IMAGE}" \
+    -f "${HERE}/client.Dockerfile" \
+    --build-arg BASE_IMAGE="${ZAMA_CLIENT_IMAGE}" \
+    "${HERE}"
+
 # symbols.Dockerfile on top of each, so Antithesis can symbolize coverage.
 symbols() {  # <zama image> <final image> <bin dir>
     step "symbols: $(basename "${2%:*}")"
@@ -159,7 +168,7 @@ symbols() {  # <zama image> <final image> <bin dir>
 }
 symbols "${ZAMA_CORE_IMAGE}" "${CORE_IMAGE}" /app/kms/core/service/bin
 symbols "${ZAMA_PROBE_IMAGE}" "${PROBE_IMAGE}" /app/kms/core/service/bin
-symbols "${ZAMA_CLIENT_IMAGE}" "${CLIENT_IMAGE}" /app/kms-core-client/bin
+symbols "${CLIENT_PYTHON_IMAGE}" "${CLIENT_IMAGE}" /app/kms-core-client/bin
 
 step "init-envsubst"
 "${ENGINE}" build -t "${ENVSUBST_IMAGE}" \
