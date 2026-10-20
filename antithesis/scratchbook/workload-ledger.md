@@ -18,6 +18,12 @@ from [api-surface.md](api-surface.md). One row per local iteration and one per A
 | 10 | 2026-10-20 | — (Antithesis run of rows 7–9) | 0, 1, 2 (`reshare`) | — | `2675775a5a08f47c69dfa815080f0252-64-4` (60 min, same parameters and images as row 3) | 7,075 (+1,145 over row 6); 1,518 functions (+215), 3,019 lines in 142 files | first run with the `reshare` group. 71 properties pass, all of Guarantee 3 among them, its fault-only markers too (1,904 reshares without a verdict; 138 chained reshares; 380 public and 194 user decryptions under reshared epochs, all correct). Failing: the same Guarantee 2 finding (15 counterexamples, "Only got 3/4 … responses") with its command's exit code, the known fail-fast exits, and kms-core exit 101 (6, the port-bind panic of row 3). The `rejoined` Sometimes that row 6 missed passed |
 | 11a | 2026-10-20 | iter05b: no change to the workload; the coverage build now instruments only the repo's crates (`images/coverage-rustc.sh`), re-measuring iter05's drivers on it | 0, 1, 2 (`reshare`) | 14,142 / 2,699 merged (seeds 14,057–14,139), the new reference: against iter05 −421 lines / −44 functions, none gained. ~2,800 driver runs per seed instead of ~800, but keygens got ~6x faster (DKG 321 ms, it was 2.1 s), so aborts stopped meeting running keygens (0–1 per seed, 9–13 before) and none of the few keygens under the cap drew `-u`: the lost code is the keygen cancel path and the uncompressed-keygen path | — | — | the earlier rows' local numbers come from the slower, fully instrumented build |
 | 11 | 2026-10-20 | iter06: Tier 2 `crs` group: `crs.start` (ceremony; one at a time, at most 2 per run, else a `max_num_bits` the cores reject), `crs.start_insecure` (at most `MAX_CRS` = 6), `crs.get_result`, `crs.get_insecure_result`, `crs.abort` (gRPC); generation and abort hold the lifecycle group "generate" | 0, 1, 2 (`reshare`, `crs`) | +1,000 lines / +221 functions over iter05b (15,142 / 2,920 merged; seeds 15,118–15,133): `zk/ceremony.rs`, `crs_generator.rs`, the CRS parts of `base.rs`, `central_kms.rs` and `crypto_material/base.rs`. On the old, fully instrumented build CRS generation ran 65–70x slower (an insecure CRS 269–468 s against 4–7 s) and starved every driver (20–106 runs per seed), which led to the build change in row 11a | `3af8ebda5530e028068fb363365282f5-64-4` (60 min, same parameters and images as row 3) | 7,667 (+592 over row 10); 1,644 functions (+126), 3,223 lines in 148 files: `crs_generator.rs`, `zk/ceremony.rs`, `crsgen.rs` new | on the normal build the same workload ran 254 commands in 4 minutes with no false Always/Unreachable. A secure ceremony keeps every core's CPUs busy ~70 s whatever `max_num_bits` is; two at once take ~110 s and both succeed ; on Antithesis 76 properties pass, every crs driver exits 0, and Guarantee 2's Always passed: all 1,557 recovery checks decrypted on their first attempt. So its two Sometimes ("…accepted connections again", "…succeeded after a failed first attempt…") were never evaluated and fail; also the known container exits (exit 1, and the exit-101 port-bind panic, 7) |
+| 12 | 2026-10-20 | iter07: `parallel_driver_keygen_abort_running.py` retimed for the 0.3 s keygens of the faster builds (abort 0.2–1.5 s after the CLI starts), `-u` 1 time in 4, and its own budget (at most 12 keygens per container, none past `MAX_KEYS` + 6 keys) instead of the shared cap, which the keygen driver fills within a minute | 0, 1, 2 (`reshare`, `crs`) | +434 lines / +51 functions over iter06 (15,576 / 2,971 merged; seeds 15,426–15,569), none lost: the keygen cancel path and its meta-store error update, the uncompressed keygen (`compute_info_uncompressed_keygen`, `gen_uncompressed_key_set`) and resharing an uncompressed key (`VerifiedPublicMaterial::new_uncompressed`, server-key digest checks) | — | — | kept. 9–12 aborts per seed met a running keygen. Driver runs fell to 1,298–1,830 per seed (2,600 in iter06): the keys aborts leave on some cores cost 1–2 decryption timeouts per seed. No false Always/Unreachable. A first version that only changed the delays (iter07a) still gated on the shared cap: 126 of its 129 runs skipped |
+| 13 | 2026-10-20 | — (Antithesis run of row 12) | 0, 1, 2 (`reshare`, `crs`) | — | `5b02a1fef023c96697ddc3fd67fba501-64-4` (60 min, **turbo** tier, otherwise as row 3) | no coverage export (`.results` holds only `environment`) | 76 properties pass. Failing: Guarantee 2's "every core accepts client connections within 600 s after faults stop" (65 counterexamples) and its command's exit code, a false positive the workload caused (Status, 2026-10-20 turbo); the known fail-fast exits (exit 1: 2,041). Not usable as the turbo reference: the next turbo run is |
+| 14 | 2026-10-20 | iter08: Tier 3 `material.list` and the `request-status` group (`metastore.get_statuses`, `metastore.list`, `metastore.info`), read-only gRPC with hand-encoded requests: pooled, unknown and malformed IDs, every store type and one that doesn't exist, status filters, page sizes around the 1000 cap, valid and unparsable page tokens | 0, 1, 2 (`reshare`, `crs`), 3 (`material.list`, `request-status`) | +269 lines / +148 functions over iter07 (15,845 / 3,118 merged; seeds 15,668–15,726): `metastore_status_service.rs` (150 lines), the meta-store listing accessors, key-material availability | — | — | kept. ~2,900 driver runs per seed; ~45 % of `metastore.list` calls are `INVALID_ARGUMENT` by design. No false Always/Unreachable |
+| 15 | 2026-10-20 | iter09: `epoch.reshare` inputs not used yet: two keys in one request (1 time in 3), re-signing 1–2 CRSes when resharing from the kms-init epoch (half the time; digest over `PDAT_CRS`), a chained source's own keys; `MAX_EPOCHS` 6 → 12, since the faster build reached 6 within a minute; epoch records list all their keys | 0, 1, 2 (`reshare`, `crs`), 3 (`material.list`, `request-status`) | +91 lines / +18 functions over iter08 (15,936 / 3,136 merged; seeds 15,816–15,936), none lost: CRS verification and re-signing in a reshare (`reshare_utils.rs`, `epoch_manager.rs`), threshold crypto-material storage | — | — | kept. 12–13 reshares per seed, 2–3 of them with two keys, 1–4 re-signing CRSes; every Guarantee 3 check true |
+| 16 | 2026-10-20 | iter10: fix for the turbo false positive of row 13: one CRS generation of either kind in flight (`exclusive("crs-generation")`), at most `MAX_CRS_REQUESTS` = 10 valid CRS requests per container, one reshare in flight, lifecycle waits 600/300 s → 120 s for keygen, abort and CRS drivers | 0, 1, 2 (`reshare`, `crs`), 3 (`material.list`, `request-status`) | +6 lines / +1 function over iter09 (15,942 / 3,136 merged): no loss from the limits | — | — | kept. 6 valid CRS requests per seed (2 ceremonies, 4 insecure), 12 reshares, 1–9 reshares skipped while another ran. No false Always/Unreachable |
+| 17 | 2026-10-20 | — (Antithesis run of rows 14–16) | 0, 1, 2 (`reshare`, `crs`), 3 (`material.list`, `request-status`) | — | `97ed35045ae50ed898fdb0b28edc5889-64-4` (60 min, turbo, otherwise as row 3) | pending | |
 
 ## How this workload differs from the skill's defaults
 
@@ -65,8 +71,9 @@ These were the user's instructions when the workload was started (2026-10-19):
   any party published. Known ways past the cap, all bounded: concurrent keygen drivers
   passing the check together; past the cap, `keygen.start_insecure` re-sends taken
   preprocessing IDs, and one whose earlier CLI failed before sending (connect or MinIO
-  error) still starts a keygen; `parallel_driver_keygen_abort_running.py` may add 2 keys past
-  `MAX_KEYS` when its aborts come too late.
+  error) still starts a keygen; `parallel_driver_keygen_abort_running.py` starts at most 12
+  keygens and none once `MAX_KEYS` + 6 keys exist, and those its aborts miss become keys.
+  With the test parameters keys are small: the cores used 44–131 MiB with 3–5 keys.
 - **The proto's caller rules.** `core/grpc/proto/kms-service.v1.proto` says no `KeyGen`,
   `AbortKeyGen`, `CrsGen` or `AbortCrsGen` may run while `NewMpcEpoch`, `DestroyMpcEpoch` or
   `DestroyMpcContext` does, and the server doesn't enforce it. A failure from such an overlap
@@ -98,6 +105,11 @@ These were the user's instructions when the workload was started (2026-10-19):
   `$ANTITHESIS_OUTPUT_DIR/sdk.jsonl`, the fallback file the shell harness used.
 
 ## Status
+
+- 2026-10-20: the Antithesis runs after row 11 use the `turbo` performance tier
+  (`antithesis.performance_tier=turbo`), at the user's request, to find more issues. Those up
+  to row 11 ran on the standard tier; edge counts compare only within a tier, so the first
+  turbo run is the reference for the later ones.
 
 - 2026-10-19: initial Tier 0 workload written and checked locally (`antithesis/local/test.sh
   check`, images `cded1193-dirty-20261019-2006`): every command exited 0; every Tier 0
@@ -145,6 +157,18 @@ These were the user's instructions when the workload was started (2026-10-19):
   (`7ad203f3…`, `3af8ebda…`) and the second in 1 (`3af8ebda…`, where all 1,557 checks decrypted
   at once), so each must-hit `Sometimes` failed on a run where nothing was wrong. Changing that
   is a property change (e.g. not must-hit), left to the user.
+- 2026-10-20, turbo run `5b02a1fe…`, workload false positive (Guarantee 2, connect bound):
+  core 1 accepted no client connection for over 600 s after faults stopped, without any fault
+  on it and without restarting. In Antithesis each core has one CPU ("total_num_cpus: 1",
+  2 tokio workers). Turbo ran many drivers at once (the composer cancelled ~25 each of
+  `crs_start_insecure`, `keygen_start_insecure` and `userdec_sync` when the eventually phase
+  began), and core 1 received ~30 `InsecureCrsGen` requests within a minute; party 1 samples
+  every insecure CRS alone, inside the request's async task, and the generations go on after
+  their CLIs are killed. So core 1's CPU went to queued test-only CRS generations and it
+  stopped serving. Fixed in the workload (iter10): one CRS generation of either kind in
+  flight, at most 10 valid CRS requests per run, lifecycle waits cut to 120 s so drivers don't
+  pile up. Worth telling the user: CPU-bound work on the server's async workers can starve its
+  connection handling; with production operations that would be a real availability issue.
 
 ## Tried and didn't help
 

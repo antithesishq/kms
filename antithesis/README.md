@@ -95,11 +95,13 @@ snouty launch --webhook advanced_k8s_test --config build/config \
   --description "<what changed>" --duration 60 \
   --param 'custom.container_faults_stop_exclusion_patterns=^kms-core-client,^minio-' \
   --param 'custom.container_faults_kill_exclusion_patterns=^kms-core-client,^minio-' \
-  --param custom.vm_memory_mb=16384
+  --param custom.vm_memory_mb=16384 \
+  --param antithesis.performance_tier=turbo
 ```
 
 The exclusions keep pod stop and kill faults off the test driver and MinIO. 16 GiB of test
 VM memory avoids the "Peak memory usage" alert that the default VM size gave.
+Runs use the `turbo` performance tier; edge counts are comparable only between runs of the same tier.
 
 ## After editing
 

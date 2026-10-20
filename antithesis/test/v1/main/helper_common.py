@@ -43,21 +43,27 @@ DEFAULT_EPOCH_ID = "08" + "0" * 61 + "1"
 #   keys/<key_id>       keys this container generated; the file holds the preprocessing ID
 #   first-key/<key_id>  the key first_generate_key.py generated, before faults started
 #   pubdec/<id>, userdec/<id>  request IDs of decryptions the CLI completed
-#   epochs/<epoch_id>   epochs a reshare created; the file holds "<key_id> confirmed" (every
-#                       core reported it done) or "<key_id> unconfirmed" (the CLI failed, so
-#                       some cores can hold the epoch and others not)
+#   epochs/<epoch_id>   epochs a reshare created; the file holds the reshared key IDs and then
+#                       "confirmed" (every core reported it done) or "unconfirmed" (the CLI
+#                       failed, so some cores can hold the epoch and others not)
 #   epochs-rejected/<epoch_id>  epochs of reshare requests meant to fail; the file holds why
 #   crs/<crs_id>        CRSes the CLI generated; the file holds "secure" or "insecure"
+#   crs-requests/<n>    one file per valid CRS generation request sent
+#   abort-runs/<id>     preprocessing IDs parallel_driver_keygen_abort_running.py used (its budget)
 #   profile/<name>      this timeline's draw of a workload knob (timeline_choice)
 STATE_DIR = "/tmp/kms-workload-state"
 
 # Keys add memory and boot time to every core, so the drivers stop making new ones here.
 MAX_KEYS = 3
-# Every reshared epoch holds a copy of a key's shares on each core, loaded at boot, so the
-# reshare driver stops here.
-MAX_EPOCHS = 6
-# CRSes are stored on every core and in MinIO, so the CRS drivers stop generating valid ones here.
+# Every reshared epoch holds a copy of its keys' shares on each core, loaded at boot, so the
+# reshare driver stops here. With the test parameters a key's shares are small.
+MAX_EPOCHS = 12
+# CRSes are stored on every core and in MinIO, so the CRS drivers stop generating valid ones
+# here. A CRS generation keeps going on the cores after its CLI is killed, and each one costs
+# a core's only CPU for a while (party 1 samples every insecure CRS alone), so the drivers
+# also send at most MAX_CRS_REQUESTS valid requests per container (crs-requests/).
 MAX_CRS = 6
+MAX_CRS_REQUESTS = 10
 
 DATA_TYPES = ["ebool", "euint8", "euint16", "euint32", "euint64", "euint128", "euint160", "euint256"]
 BATCH_SIZES = [1, 1, 1, 2, 3]
@@ -95,6 +101,15 @@ def pick_decrypt_inputs():
     return {"data_type": data_type, "value_hex": pick_value(data_type), "batch": pick(BATCH_SIZES),
             "no_compression": pick([False, False, False, True]),
             "no_precompute_sns": pick([False, False, False, True])}
+
+
+def crs_request_allowed():
+    """Whether a CRS driver may send a valid generation request now; if so, counts it. The
+    caller holds exclusive("crs-generation"), so one is in flight at a time."""
+    if len(pool("crs")) >= MAX_CRS or len(pool("crs-requests")) >= MAX_CRS_REQUESTS:
+        return False
+    record("crs-requests", rand_hex(8))
+    return True
 
 
 def pick_crs_bits(valid=True):
@@ -234,17 +249,19 @@ def new_epoch_id():
     return "08" + rand_hex(31)
 
 
+def epoch_record(epoch):
+    """(key IDs, status) of a recorded reshared epoch, or ([], None) if it can't be read."""
+    try:
+        with open(f"{STATE_DIR}/epochs/{epoch}") as f:
+            tokens = f.read().split()
+    except FileNotFoundError:
+        return [], None
+    return (tokens[:-1], tokens[-1]) if len(tokens) >= 2 else ([], None)
+
+
 def epochs_of(key_id, status):
     """The recorded epochs with status (confirmed or unconfirmed) that key_id was reshared into."""
-    found = []
-    for epoch in pool("epochs"):
-        try:
-            with open(f"{STATE_DIR}/epochs/{epoch}") as f:
-                if f.read().split() == [key_id, status]:
-                    found.append(epoch)
-        except FileNotFoundError:
-            pass
-    return found
+    return [e for e in pool("epochs") if epoch_record(e)[1] == status and key_id in epoch_record(e)[0]]
 
 
 def pick_epoch(key_id):

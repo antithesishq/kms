@@ -131,6 +131,18 @@ spec:
         - mountPath: /opt/antithesis/test/v1/main/parallel_driver_keygen_start_insecure.py
           subPath: parallel_driver_keygen_start_insecure.py
           name: workload-tests
+        - mountPath: /opt/antithesis/test/v1/main/parallel_driver_material_list.py
+          subPath: parallel_driver_material_list.py
+          name: workload-tests
+        - mountPath: /opt/antithesis/test/v1/main/parallel_driver_metastore_get_statuses.py
+          subPath: parallel_driver_metastore_get_statuses.py
+          name: workload-tests
+        - mountPath: /opt/antithesis/test/v1/main/parallel_driver_metastore_info.py
+          subPath: parallel_driver_metastore_info.py
+          name: workload-tests
+        - mountPath: /opt/antithesis/test/v1/main/parallel_driver_metastore_list.py
+          subPath: parallel_driver_metastore_list.py
+          name: workload-tests
         - mountPath: /opt/antithesis/test/v1/main/parallel_driver_preproc_get_insecure_result.py
           subPath: parallel_driver_preproc_get_insecure_result.py
           name: workload-tests

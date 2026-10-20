@@ -9,7 +9,7 @@ from helper_grpc import call_with_request_id, pick_core
 OP = "crs.abort"
 
 ids = pool("crs")
-with lifecycle("generate", wait=300) as held:
+with lifecycle("generate", wait=120) as held:
     if not held:
         log_outcome(OP, "skipped=epoch_change_running")
         sys.exit(0)

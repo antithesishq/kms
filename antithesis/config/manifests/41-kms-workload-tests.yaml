@@ -199,21 +199,27 @@ data:
     #   keys/<key_id>       keys this container generated; the file holds the preprocessing ID
     #   first-key/<key_id>  the key first_generate_key.py generated, before faults started
     #   pubdec/<id>, userdec/<id>  request IDs of decryptions the CLI completed
-    #   epochs/<epoch_id>   epochs a reshare created; the file holds "<key_id> confirmed" (every
-    #                       core reported it done) or "<key_id> unconfirmed" (the CLI failed, so
-    #                       some cores can hold the epoch and others not)
+    #   epochs/<epoch_id>   epochs a reshare created; the file holds the reshared key IDs and then
+    #                       "confirmed" (every core reported it done) or "unconfirmed" (the CLI
+    #                       failed, so some cores can hold the epoch and others not)
     #   epochs-rejected/<epoch_id>  epochs of reshare requests meant to fail; the file holds why
     #   crs/<crs_id>        CRSes the CLI generated; the file holds "secure" or "insecure"
+    #   crs-requests/<n>    one file per valid CRS generation request sent
+    #   abort-runs/<id>     preprocessing IDs parallel_driver_keygen_abort_running.py used (its budget)
     #   profile/<name>      this timeline's draw of a workload knob (timeline_choice)
     STATE_DIR = "/tmp/kms-workload-state"
 
     # Keys add memory and boot time to every core, so the drivers stop making new ones here.
     MAX_KEYS = 3
-    # Every reshared epoch holds a copy of a key's shares on each core, loaded at boot, so the
-    # reshare driver stops here.
-    MAX_EPOCHS = 6
-    # CRSes are stored on every core and in MinIO, so the CRS drivers stop generating valid ones here.
+    # Every reshared epoch holds a copy of its keys' shares on each core, loaded at boot, so the
+    # reshare driver stops here. With the test parameters a key's shares are small.
+    MAX_EPOCHS = 12
+    # CRSes are stored on every core and in MinIO, so the CRS drivers stop generating valid ones
+    # here. A CRS generation keeps going on the cores after its CLI is killed, and each one costs
+    # a core's only CPU for a while (party 1 samples every insecure CRS alone), so the drivers
+    # also send at most MAX_CRS_REQUESTS valid requests per container (crs-requests/).
     MAX_CRS = 6
+    MAX_CRS_REQUESTS = 10
 
     DATA_TYPES = ["ebool", "euint8", "euint16", "euint32", "euint64", "euint128", "euint160", "euint256"]
     BATCH_SIZES = [1, 1, 1, 2, 3]
@@ -251,6 +257,15 @@ data:
         return {"data_type": data_type, "value_hex": pick_value(data_type), "batch": pick(BATCH_SIZES),
                 "no_compression": pick([False, False, False, True]),
                 "no_precompute_sns": pick([False, False, False, True])}
+
+
+    def crs_request_allowed():
+        """Whether a CRS driver may send a valid generation request now; if so, counts it. The
+        caller holds exclusive("crs-generation"), so one is in flight at a time."""
+        if len(pool("crs")) >= MAX_CRS or len(pool("crs-requests")) >= MAX_CRS_REQUESTS:
+            return False
+        record("crs-requests", rand_hex(8))
+        return True
 
 
     def pick_crs_bits(valid=True):
@@ -390,17 +405,19 @@ data:
         return "08" + rand_hex(31)
 
 
+    def epoch_record(epoch):
+        """(key IDs, status) of a recorded reshared epoch, or ([], None) if it can't be read."""
+        try:
+            with open(f"{STATE_DIR}/epochs/{epoch}") as f:
+                tokens = f.read().split()
+        except FileNotFoundError:
+            return [], None
+        return (tokens[:-1], tokens[-1]) if len(tokens) >= 2 else ([], None)
+
+
     def epochs_of(key_id, status):
         """The recorded epochs with status (confirmed or unconfirmed) that key_id was reshared into."""
-        found = []
-        for epoch in pool("epochs"):
-            try:
-                with open(f"{STATE_DIR}/epochs/{epoch}") as f:
-                    if f.read().split() == [key_id, status]:
-                        found.append(epoch)
-            except FileNotFoundError:
-                pass
-        return found
+        return [e for e in pool("epochs") if epoch_record(e)[1] == status and key_id in epoch_record(e)[0]]
 
 
     def pick_epoch(key_id):
@@ -717,12 +734,15 @@ data:
             if after_failed_call:
                 sleep(10)
   helper_grpc.py: |
-    """Direct gRPC calls to one core's service endpoint, for result RPCs that take only a
-    RequestId. kms-core-client has no command for some of them (GetUserDecryptionResult), and
-    the ones it has always ask every core and verify the result, which a driver doesn't need.
+    """Direct gRPC calls to one core's service port, for RPCs whose request a driver can build by
+    hand: those that take only a RequestId or nothing, and the meta-store status queries.
+    kms-core-client has no command for some of them (GetUserDecryptionResult, the
+    MetaStoreStatusService), and the ones it has always ask every core and verify the result,
+    which a driver doesn't need.
 
-    Requests are hand-encoded protobuf: RequestId is message { string request_id = 1; }. The
-    response bytes are not decoded; only the status code matters to a driver.
+    Requests are hand-encoded protobuf (pb_string, pb_varint): RequestId is message { string
+    request_id = 1; }, Empty is no bytes. The response bytes are not decoded; only the status
+    code matters to a driver.
     """
     import re
 
@@ -731,6 +751,7 @@ data:
     from helper_common import CLIENT_DIR, pick
 
     SERVICE = "/kms_service.v1.CoreServiceEndpoint/"
+    METASTORE_SERVICE = "/metastore_status.v1.MetaStoreStatusService/"
 
 
     def core_addresses():
@@ -749,21 +770,45 @@ data:
         return pick(core_addresses())
 
 
+    def varint(n):
+        """Protobuf varint; a negative int32 is sign-extended to 64 bits, as protobuf does."""
+        n &= (1 << 64) - 1
+        out = b""
+        while True:
+            out += bytes([n & 0x7F | (0x80 if n > 0x7F else 0)])
+            n >>= 7
+            if not n:
+                return out
+
+
+    def pb_string(field, text):
+        data = text.encode()
+        return varint(field << 3 | 2) + varint(len(data)) + data
+
+
+    def pb_varint(field, n):
+        return varint(field << 3) + varint(n)
+
+
     def request_id_message(request_id):
-        data = request_id.encode()
-        assert len(data) < 128  # one-byte varint length
-        return b"\x0a" + bytes([len(data)]) + data
+        return pb_string(1, request_id)
 
 
-    def call_with_request_id(address, method, request_id, timeout):
-        """Call method on the core at address. Returns "ok" or "error=<gRPC status code>"."""
+    def call(address, path, payload, timeout):
+        """Call the RPC at path ("/package.Service/Method") on the core at address with the
+        encoded request payload. Returns "ok" or "error=<gRPC status code>"."""
         with grpc.insecure_channel(address) as channel:
-            rpc = channel.unary_unary(SERVICE + method)
+            rpc = channel.unary_unary(path)
             try:
-                rpc(request_id_message(request_id), timeout=timeout)
+                rpc(payload, timeout=timeout)
                 return "ok"
             except grpc.RpcError as e:
                 return f"error={e.code().name}"
+
+
+    def call_with_request_id(address, method, request_id, timeout):
+        """Call a CoreServiceEndpoint method that takes a RequestId on the core at address."""
+        return call(address, SERVICE + method, request_id_message(request_id), timeout)
   helper_properties.py: |
     """The property catalog's assertions (antithesis/scratchbook/property-catalog.md), and the
     classification of kms-core-client runs that they are evaluated on.
@@ -1130,49 +1175,98 @@ data:
             sometimes(MSG_RESHARE_SOURCE_AFTER_FAIL, False, dict(details, error=tail(out)))
         return "no_verdict"
   helper_reshare.py: |
-    """What the reshare driver needs besides the reshare itself: the key to reshare and the
-    digests its request carries, every party's public-key digest, and the decryption under the
-    source epoch afterwards. Not a command; Test Composer skips helper_ files.
+    """What the reshare drivers need besides the reshare itself: the keys, source epoch and CRSes
+    to reshare and the digests the request carries, every party's public-key digest, and the
+    decryption under the source epoch afterwards. Not a command; Test Composer skips helper_ files.
     """
-    from helper_common import (DEFAULT_CONTEXT_ID, DEFAULT_EPOCH_ID, STATE_DIR, cli_connected, cli_unreached_party,
-                               fetch_public, key_digest, keys_on_every_core, now_s, pick, pick_value, pool, run_cli,
-                               sleep, write_client_config)
+    import hashlib
+
+    from helper_common import (DEFAULT_CONTEXT_ID, DEFAULT_EPOCH_ID, STATE_DIR, chance, cli_connected,
+                               cli_unreached_party, epoch_record, fetch_public, key_digest, keys_on_every_core, now_s,
+                               pick, pick_value, pool, run_cli, sleep, write_client_config)
     from helper_grpc import call_with_request_id, core_addresses
     from helper_properties import judge_source_decrypt
 
 
-    def pick_reshare_key():
-        """(key ID, preprocessing ID) of a key every core holds, among those this container
-        generated (the file in keys/ holds the preprocessing ID), or None."""
+    def reshare_candidates():
+        """{key ID: preprocessing ID} of the keys every core holds, among those this container
+        generated (the file in keys/ holds the preprocessing ID)."""
         everywhere = set(keys_on_every_core())
-        keys = [k for k in pool("keys") if k in everywhere]
-        if not keys:
-            return None
-        key_id = pick(keys)
-        try:
-            with open(f"{STATE_DIR}/keys/{key_id}") as f:
-                preproc_id = f.read().strip()
-        except FileNotFoundError:
-            return None
-        return (key_id, preproc_id) if preproc_id else None
+        found = {}
+        for key_id in pool("keys"):
+            if key_id in everywhere:
+                try:
+                    with open(f"{STATE_DIR}/keys/{key_id}") as f:
+                        preproc_id = f.read().strip()
+                except FileNotFoundError:
+                    continue
+                if preproc_id:
+                    found[key_id] = preproc_id
+        return found
 
 
-    def previous_epoch_params(key_id, preproc_id, source_epoch):
-        """new-epoch's --previous-epoch-params for resharing key_id from source_epoch, or None when
-        the key material can't be read from MinIO. The request carries the digests of the key's
-        public material, and every core compares them with its own copy before it takes part.
-        Party 1's copy is the reference: a compressed key has a CompressedXofKeySet, an
-        uncompressed one (-u) a ServerKey."""
-        status, keyset = fetch_public(f"PUB-p1/CompressedXofKeySet/{key_id}")
-        field = "xof_key_digest"
-        if status != "ok":
-            status, keyset = fetch_public(f"PUB-p1/ServerKey/{key_id}")
-            field = "server_key_digest"
-        pk_status, public_key = fetch_public(f"PUB-p1/PublicKey/{key_id}")
-        if status != "ok" or pk_status != "ok":
-            return None
-        return (f"context_id:{DEFAULT_CONTEXT_ID};epoch_id:{source_epoch};previous_keys:[key_id={key_id},"
-                f"preproc_id={preproc_id},{field}={key_digest(keyset)},public_key_digest={key_digest(public_key)}]")
+    def pick_reshare_key():
+        """(key ID, preprocessing ID) of a key every core holds, or None."""
+        candidates = reshare_candidates()
+        key_id = pick(sorted(candidates)) if candidates else None
+        return (key_id, candidates[key_id]) if key_id else None
+
+
+    def plan_reshare():
+        """([(key ID, preprocessing ID)], source epoch) for a reshare, or None: one key, or two 1
+        time in 3, from the kms-init epoch, or half the time from a confirmed reshared epoch (then
+        among that epoch's keys, which it holds)."""
+        candidates = reshare_candidates()
+        chained = [e for e in pool("epochs") if epoch_record(e)[1] == "confirmed"
+                   and all(k in candidates for k in epoch_record(e)[0])]
+        source, keys = DEFAULT_EPOCH_ID, sorted(candidates)
+        if chained and chance(50):
+            source = pick(chained)
+            keys = epoch_record(source)[0]
+        chosen = []
+        for _ in range(min(pick([1, 1, 2]), len(keys))):
+            chosen.append(pick([k for k in keys if k not in chosen]))
+        return ([(k, candidates[k]) for k in chosen], source) if chosen else None
+
+
+    def pick_crs_to_resign():
+        """[(CRS ID, digest)] of 1 or 2 CRSes from crs/ to re-sign in a reshare from the kms-init
+        epoch, which holds them, half the time, or []. The digest is SHAKE-256/32 of the PDAT_CRS
+        domain separator and party 1's CRS object (DSEP_PUBDATA_CRS in core/service/src/engine/base.rs)."""
+        crs_ids = pool("crs")
+        if not crs_ids or not chance(50):
+            return []
+        chosen = []
+        for _ in range(min(pick([1, 2]), len(crs_ids))):
+            crs_id = pick([c for c in crs_ids if c not in [x for x, _ in chosen]])
+            status, data = fetch_public(f"PUB-p1/CRS/{crs_id}")
+            if status == "ok":
+                chosen.append((crs_id, hashlib.shake_256(b"PDAT_CRS" + data).hexdigest(32)))
+        return chosen
+
+
+    def previous_epoch_params(keys, source_epoch, crs=()):
+        """new-epoch's --previous-epoch-params for resharing keys ([(key ID, preprocessing ID)])
+        and re-signing crs ([(CRS ID, digest)]) from source_epoch, or None when key material can't
+        be read from MinIO. The request carries the digests of each key's public material, and
+        every core compares them with its own copy before it takes part. Party 1's copy is the
+        reference: a compressed key has a CompressedXofKeySet, an uncompressed one (-u) a ServerKey."""
+        entries = []
+        for key_id, preproc_id in keys:
+            status, keyset = fetch_public(f"PUB-p1/CompressedXofKeySet/{key_id}")
+            field = "xof_key_digest"
+            if status != "ok":
+                status, keyset = fetch_public(f"PUB-p1/ServerKey/{key_id}")
+                field = "server_key_digest"
+            pk_status, public_key = fetch_public(f"PUB-p1/PublicKey/{key_id}")
+            if status != "ok" or pk_status != "ok":
+                return None
+            entries.append(f"key_id={key_id},preproc_id={preproc_id},{field}={key_digest(keyset)},"
+                           f"public_key_digest={key_digest(public_key)}")
+        params = f"context_id:{DEFAULT_CONTEXT_ID};epoch_id:{source_epoch};previous_keys:[{';'.join(entries)}]"
+        if crs:
+            params += ";previous_crs:[" + ";".join(f"crs_id={c},digest={d}" for c, d in crs) + "]"
+        return params
 
 
     def wait_epoch_settled(epoch_id, bound=300):
@@ -1238,7 +1332,7 @@ data:
     OP = "crs.abort"
 
     ids = pool("crs")
-    with lifecycle("generate", wait=300) as held:
+    with lifecycle("generate", wait=120) as held:
         if not held:
             log_outcome(OP, "skipped=epoch_change_running")
             sys.exit(0)
@@ -1277,23 +1371,25 @@ data:
     crs-gen polls GetCrsGenResult on every core, downloads the CRS and checks the signatures.
 
     A ceremony keeps every core's CPUs busy for about a minute, whatever max_num_bits is, so one
-    runs at a time and at most MAX_SECURE_CRS per run. Otherwise the driver sends a max_num_bits
-    the cores reject before any ceremony starts (pick_crs_bits(valid=False)), as it does 1 time in
-    10 anyway. Never while a reshare runs (lifecycle)."""
+    CRS generation of either kind runs at a time, at most MAX_SECURE_CRS ceremonies per run, and
+    within the CRS budget (crs_request_allowed). Otherwise the driver sends a max_num_bits the
+    cores reject before any ceremony starts, as it does 1 time in 10 anyway. Never while a
+    reshare runs (lifecycle)."""
     import sys
 
-    from helper_common import (cli_outcome, enter_scratch_dir, exclusive, lifecycle, log_outcome, pick_crs_bits,
-                               pool_matching, record, request_id_from, run_cli)
+    from helper_common import (cli_outcome, crs_request_allowed, enter_scratch_dir, exclusive, lifecycle, log_outcome,
+                               pick_crs_bits, pool_matching, record, request_id_from, run_cli)
 
     OP = "crs.start"
     MAX_SECURE_CRS = 2
 
     enter_scratch_dir()
-    with lifecycle("generate", wait=600) as held, exclusive("ceremony") as alone:
+    with lifecycle("generate", wait=120) as held, exclusive("crs-generation") as alone:
         if not held:
             log_outcome(OP, "skipped=epoch_change_running")
             sys.exit(0)
-        bits = pick_crs_bits(valid=alone and len(pool_matching("crs", "secure")) < MAX_SECURE_CRS)
+        bits = pick_crs_bits(valid=alone and len(pool_matching("crs", "secure")) < MAX_SECURE_CRS
+                             and crs_request_allowed())
         rc, out = run_cli(["--max-iter", 1800, "crs-gen", "--max-num-bits", bits], timeout=900)
         log_outcome(OP, cli_outcome(rc, out))
         if rc == 0 and request_id_from(out):
@@ -1302,21 +1398,23 @@ data:
     #!/usr/bin/env python3
     """Insecure CRS generation (InsecureCrsGen; party 1 samples the CRS): kms-core-client
     insecure-crs-gen polls GetInsecureCrsGenResult on every core, downloads the CRS and checks the
-    signatures. max_num_bits is a power of 2 up to 2048, or sometimes a value the cores must
-    reject; past MAX_CRS CRSes only such values. Never while a reshare runs (lifecycle)."""
+    signatures. max_num_bits is a power of 2 up to 2048, or a value the cores must reject: 1 time
+    in 10, and whenever another CRS generation is in flight or the CRS budget is spent
+    (crs_request_allowed), since each one takes party 1's CPU for a while. Never while a reshare
+    runs (lifecycle)."""
     import sys
 
-    from helper_common import (MAX_CRS, cli_outcome, enter_scratch_dir, lifecycle, log_outcome, pick_crs_bits, pool,
-                               record, request_id_from, run_cli)
+    from helper_common import (cli_outcome, crs_request_allowed, enter_scratch_dir, exclusive, lifecycle, log_outcome,
+                               pick_crs_bits, record, request_id_from, run_cli)
 
     OP = "crs.start_insecure"
 
     enter_scratch_dir()
-    with lifecycle("generate", wait=600) as held:
+    with lifecycle("generate", wait=120) as held, exclusive("crs-generation") as alone:
         if not held:
             log_outcome(OP, "skipped=epoch_change_running")
             sys.exit(0)
-        bits = pick_crs_bits(valid=len(pool("crs")) < MAX_CRS)
+        bits = pick_crs_bits(valid=alone and crs_request_allowed())
         rc, out = run_cli(["--max-iter", 600, "insecure-crs-gen", "--max-num-bits", bits], timeout=600)
         log_outcome(OP, cli_outcome(rc, out))
         if rc == 0 and request_id_from(out):
@@ -1336,55 +1434,55 @@ data:
         log_outcome(OP, call_with_request_id(address, "GetEpochResult", pick_request_id(ids), timeout=30))
   parallel_driver_epoch_reshare.py: |
     #!/usr/bin/env python3
-    """Reshares a key every core holds into a fresh epoch (kms-core-client new-epoch), from the
-    kms-init epoch or one a reshare created, while decryptions run; the CLI checks every core's
-    result against the key and its published material. Then Guarantee 3's checks: every party's
-    public key is unchanged, and the source epoch still decrypts. The new epoch is recorded for
-    the decryption drivers. No keygen or keygen abort runs meanwhile (helper_common.lifecycle)."""
+    """Reshares one or two keys every core holds into a fresh epoch (kms-core-client new-epoch),
+    from the kms-init epoch (re-signing its CRSes half the time) or one a reshare created, while
+    decryptions run. Then Guarantee 3's checks: each key's public key is unchanged on every party,
+    and the source epoch still decrypts. The new epoch is recorded for the decryption drivers. One
+    reshare at a time (each takes every core's CPU), and no keygen or keygen abort meanwhile."""
     import sys
 
-    from helper_common import (DEFAULT_CONTEXT_ID, DEFAULT_EPOCH_ID, MAX_EPOCHS, chance, cli_outcome, enter_scratch_dir,
-                               epochs_of, lifecycle, log_outcome, new_epoch_id, pick, pool, record, run_cli)
+    from helper_common import (DEFAULT_CONTEXT_ID, DEFAULT_EPOCH_ID, MAX_EPOCHS, cli_outcome, enter_scratch_dir,
+                               exclusive, lifecycle, log_outcome, new_epoch_id, pick, pool, record, run_cli)
     from helper_properties import declare_catalog, judge_public_key, judge_reshare
-    from helper_reshare import (check_source_epoch, pick_reshare_key, previous_epoch_params, public_key_digests,
-                                wait_epoch_settled)
+    from helper_reshare import (check_source_epoch, pick_crs_to_resign, plan_reshare, previous_epoch_params,
+                                public_key_digests, wait_epoch_settled)
 
     OP = "epoch.reshare"
 
     declare_catalog()
-    key = pick_reshare_key() if len(pool("epochs")) < MAX_EPOCHS else None
-    if key is None:
+    plan = plan_reshare() if len(pool("epochs")) < MAX_EPOCHS else None
+    if plan is None:
         log_outcome(OP, "skipped=no_key_or_max_epochs")
         sys.exit(0)
-    key_id, preproc_id = key
-    chained = epochs_of(key_id, "confirmed")
-    source_epoch = pick(chained) if chained and chance(50) else DEFAULT_EPOCH_ID
+    keys, source_epoch = plan
+    crs = pick_crs_to_resign() if source_epoch == DEFAULT_EPOCH_ID else []
     new_epoch = new_epoch_id()
     enter_scratch_dir()
-    previous = previous_epoch_params(key_id, preproc_id, source_epoch)
+    previous = previous_epoch_params(keys, source_epoch, crs)
     if previous is None:
         log_outcome(OP, "skipped=key_material_unreadable")
         sys.exit(0)
-    before = public_key_digests(key_id)
-    with lifecycle("epoch", wait=300) as held:
-        if not held:
-            log_outcome(OP, "skipped=generation_running")
+    key_ids = [k for k, _ in keys]
+    before = {k: public_key_digests(k) for k in key_ids}
+    with exclusive("reshare") as alone, lifecycle("epoch", wait=300 if alone else 0) as held:
+        if not (alone and held):
+            log_outcome(OP, "skipped=reshare_or_generation_running")
             sys.exit(0)
         rc, out = run_cli(["--max-iter", 1200, "new-epoch", "--new-epoch-id", new_epoch, "--new-context-id",
                            DEFAULT_CONTEXT_ID, "--previous-epoch-params", previous], timeout=900)
         log_outcome(OP, cli_outcome(rc, out))
-        details = dict(key_id=key_id, preproc_id=preproc_id, source_epoch=source_epoch, new_epoch=new_epoch,
+        details = dict(key_ids=key_ids, crs_ids=[c for c, _ in crs], source_epoch=source_epoch, new_epoch=new_epoch,
                        exit_code=rc)
         outcome = judge_reshare(rc, out, details)
         if outcome != "done":
             wait_epoch_settled(new_epoch)
     if outcome == "args":
         sys.exit(1)
-    record("epochs", new_epoch, f"{key_id} {'confirmed' if outcome == 'done' else 'unconfirmed'}")
+    record("epochs", new_epoch, " ".join(key_ids + ["confirmed" if outcome == "done" else "unconfirmed"]))
     details["outcome"] = outcome
-    unchanged = judge_public_key(before, public_key_digests(key_id), details)
-    source_ok = check_source_epoch(key_id, source_epoch, details)
-    sys.exit(0 if unchanged and source_ok and outcome != "wrong" else 1)
+    unchanged = [judge_public_key(before[k], public_key_digests(k), dict(details, key_id=k)) for k in key_ids]
+    source_ok = check_source_epoch(pick(key_ids), source_epoch, details)
+    sys.exit(0 if all(unchanged) and source_ok and outcome != "wrong" else 1)
   parallel_driver_epoch_reshare_rejected.py: |
     #!/usr/bin/env python3
     """epoch.reshare with a request that must fail: a wrong key digest or preprocessing ID, an
@@ -1415,7 +1513,7 @@ data:
     source_epoch = new_epoch_id() if kind == "unknown_source" else DEFAULT_EPOCH_ID
     new_epoch = DEFAULT_EPOCH_ID if kind == "existing_epoch" else new_epoch_id()
     enter_scratch_dir()
-    previous = previous_epoch_params(key_id, rand_hex(32) if kind == "preproc" else preproc_id, source_epoch)
+    previous = previous_epoch_params([(key_id, rand_hex(32) if kind == "preproc" else preproc_id)], source_epoch)
     if previous is None:
         log_outcome(OP, "skipped=key_material_unreadable")
         sys.exit(0)
@@ -1448,7 +1546,7 @@ data:
     OP = "keygen.abort"
 
     ids = pool("preproc-taken") or pool("preproc")
-    with lifecycle("generate", wait=300) as held:
+    with lifecycle("generate", wait=120) as held:
         if not held:
             log_outcome(OP, "skipped=epoch_change_running")
             sys.exit(0)
@@ -1464,20 +1562,25 @@ data:
     path: inner_abort_key_gen finding the keygen and key_gen_background recording "Key generation
     was aborted". The delay spans the CLI's connect plus the DKG and the key writes.
 
-    An abort that comes too late, or reaches only some cores, leaves a key on some or all of
-    them. Most don't, so this may go 2 keys past MAX_KEYS, and stops there. Nothing here runs
-    while a reshare does (helper_common.lifecycle)."""
+    It has its own budget, since the keygen driver fills MAX_KEYS within a minute: at most
+    MAX_RUNS keygens per container (abort-runs/), and none once MAX_KEYS + 6 keys exist, because
+    an abort that comes too late, or reaches only some cores, leaves a key on some or all of
+    them. Nothing here runs while a reshare does (helper_common.lifecycle)."""
     import sys
 
     from helper_common import (MAX_KEYS, chance, cli_outcome, enter_scratch_dir, key_count, lifecycle, log_outcome,
-                               pick, record, request_id_from, sleep, start_cli, take, wait_cli)
+                               pick, pool, record, request_id_from, sleep, start_cli, take, wait_cli)
     from helper_grpc import call_with_request_id, core_addresses
 
-    with lifecycle("generate", wait=600) as held:
-        preproc_id = take("preproc") if held and key_count() < MAX_KEYS + 2 else None
+    MAX_RUNS = 12
+
+    with lifecycle("generate", wait=120) as held:
+        room = held and len(pool("abort-runs")) < MAX_RUNS and key_count() < MAX_KEYS + 6
+        preproc_id = take("preproc") if room else None
         if preproc_id is None:
-            log_outcome("keygen.abort", "skipped=no_preproc_or_max_keys_or_epoch_change")
+            log_outcome("keygen.abort", "skipped=no_preproc_or_budget_or_epoch_change")
             sys.exit(0)
+        record("abort-runs", preproc_id)
         enter_scratch_dir()
         try:
             keygen = start_cli(["--max-iter", 600, "insecure-key-gen", "--preproc-id", preproc_id]
@@ -1522,7 +1625,7 @@ data:
 
     enter_scratch_dir()
     for _ in range(pick_count(1, 2)):
-        with lifecycle("generate", wait=600) as held:
+        with lifecycle("generate", wait=120) as held:
             if not held:
                 log_outcome(OP, "skipped=epoch_change_running")
                 continue
@@ -1536,6 +1639,74 @@ data:
             log_outcome(OP, cli_outcome(rc, out))
             if rc == 0 and request_id_from(out):
                 record("keys", request_id_from(out), preproc_id)
+  parallel_driver_material_list.py: |
+    #!/usr/bin/env python3
+    """GetKeyMaterialAvailability (empty request) on random cores: which keys, CRSes and
+    preprocessing material each core holds."""
+    from helper_common import log_outcome, pick_count
+    from helper_grpc import SERVICE, call, pick_core
+
+    OP = "material.list"
+
+    for _ in range(pick_count(1, 3)):
+        _, address = pick_core()
+        log_outcome(OP, call(address, SERVICE + "GetKeyMaterialAvailability", b"", timeout=30))
+  parallel_driver_metastore_get_statuses.py: |
+    #!/usr/bin/env python3
+    """GetRequestStatuses (MetaStoreStatusService) on random cores: 0–5 request IDs the drivers
+    pooled, mixed with unknown or malformed ones, for one meta store, for all of them (ALL, or
+    the field unset), or for a type that doesn't exist (9)."""
+    from helper_common import log_outcome, pick, pick_count, pick_request_id, pool
+    from helper_grpc import METASTORE_SERVICE, call, pb_string, pb_varint, pick_core
+
+    OP = "metastore.get_statuses"
+    # MetaStoreType -> the pools holding that store's request IDs.
+    POOLS = {1: ["keys"], 2: ["pubdec"], 3: ["userdec"], 4: ["crs"], 5: ["preproc", "preproc-taken"]}
+
+    for _ in range(pick_count(1, 3)):
+        store = pick([None, 0, 1, 2, 3, 4, 5, 9])
+        names = POOLS.get(store) or [n for ns in POOLS.values() for n in ns]
+        ids = [i for n in names for i in pool(n)]
+        payload = b"".join(pb_string(1, pick_request_id(ids)) for _ in range(pick_count(0, 5)))
+        if store is not None:
+            payload += pb_varint(2, store)
+        _, address = pick_core()
+        log_outcome(OP, call(address, METASTORE_SERVICE + "GetRequestStatuses", payload, timeout=30))
+  parallel_driver_metastore_info.py: |
+    #!/usr/bin/env python3
+    """GetMetaStoreInfo (MetaStoreStatusService, empty request) on random cores: each meta
+    store's capacity and current count."""
+    from helper_common import log_outcome, pick_count
+    from helper_grpc import METASTORE_SERVICE, call, pick_core
+
+    OP = "metastore.info"
+
+    for _ in range(pick_count(1, 3)):
+        _, address = pick_core()
+        log_outcome(OP, call(address, METASTORE_SERVICE + "GetMetaStoreInfo", b"", timeout=30))
+  parallel_driver_metastore_list.py: |
+    #!/usr/bin/env python3
+    """ListRequests (MetaStoreStatusService) on random cores: one meta store or all, an optional
+    status filter (one that doesn't exist too), a page size that is unset, non-positive, small,
+    at the 1000 cap or past it, and a page token that is unset, a valid offset, or unparsable."""
+    from helper_common import log_outcome, pick, pick_count
+    from helper_grpc import METASTORE_SERVICE, call, pb_string, pb_varint, pick_core
+
+    OP = "metastore.list"
+
+    for _ in range(pick_count(1, 3)):
+        payload = pb_varint(1, pick([0, 1, 2, 3, 4, 5, 9]))
+        status = pick([None, None, 0, 1, 2, 3, 4, 7])
+        if status is not None:
+            payload += pb_varint(2, status)
+        size = pick([None, 0, -1, 1, 10, 1000, 5000])
+        if size is not None:
+            payload += pb_varint(3, size)
+        token = pick([None, None, "0", "1", "5", "100", "18446744073709551615", "x", "-1"])
+        if token is not None:
+            payload += pb_string(4, token)
+        _, address = pick_core()
+        log_outcome(OP, call(address, METASTORE_SERVICE + "ListRequests", payload, timeout=30))
   parallel_driver_preproc_get_insecure_result.py: |
     #!/usr/bin/env python3
     """GetInsecureKeyGenPreprocResult on random cores, for pooled preprocessing IDs (unused and

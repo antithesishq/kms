@@ -12,7 +12,7 @@ OP = "keygen.start_insecure"
 
 enter_scratch_dir()
 for _ in range(pick_count(1, 2)):
-    with lifecycle("generate", wait=600) as held:
+    with lifecycle("generate", wait=120) as held:
         if not held:
             log_outcome(OP, "skipped=epoch_change_running")
             continue

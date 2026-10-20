@@ -27,7 +27,7 @@ if len(pool("epochs-rejected")) >= REJECTED_EPOCHS:
 source_epoch = new_epoch_id() if kind == "unknown_source" else DEFAULT_EPOCH_ID
 new_epoch = DEFAULT_EPOCH_ID if kind == "existing_epoch" else new_epoch_id()
 enter_scratch_dir()
-previous = previous_epoch_params(key_id, rand_hex(32) if kind == "preproc" else preproc_id, source_epoch)
+previous = previous_epoch_params([(key_id, rand_hex(32) if kind == "preproc" else preproc_id)], source_epoch)
 if previous is None:
     log_outcome(OP, "skipped=key_material_unreadable")
     sys.exit(0)
