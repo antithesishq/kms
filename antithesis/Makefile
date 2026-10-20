@@ -1,12 +1,17 @@
 # Run from this directory (make <target>) or from the repo root (make -C antithesis <target>).
 HERE := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
-.PHONY: build push config driver k3s load up down test
+.PHONY: build push config driver k3s load up down test build-coverage
 
 # Build the four KMS images into the local image store, tagged with the git
 # commit (see images/build.sh).
 build:
 	$(HERE)images/build.sh
+
+# Build the local-only coverage variant of core-service on top of the last build
+# (images/build-coverage.sh), for local/run-local.sh. Never pushed.
+build-coverage:
+	$(HERE)images/build-coverage.sh
 
 # Push the last build to the Antithesis registry.
 push:
@@ -17,7 +22,7 @@ push:
 config:
 	$(HERE)config/render.sh
 
-# Regenerate config/manifests/41-kms-workload-tests.yaml from test/v1/.
+# Regenerate config/manifests/41-kms-workload-tests.yaml and the client pod's test mounts from test/v1/main/.
 driver:
 	$(HERE)test/render-configmap.sh
 
@@ -39,6 +44,6 @@ up: config
 down:
 	kapp delete -a kms --yes
 
-# Run the test commands in the client pod: keygen, driver, reshare, driver, recovery check.
+# Run the test commands in the client pod: first keygen, every driver, recovery check.
 test:
 	$(HERE)local/test.sh

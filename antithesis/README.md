@@ -31,11 +31,12 @@ In a run, the triage report's Setup group shows whether this worked:
 | `build` | Builds the four images into podman, tagged with the git commit |
 | `push` | Pushes the last build to the Antithesis registry |
 | `config` | Renders `config/` into `build/config/` with the tag of the last build |
-| `driver` | Regenerates `config/manifests/41-kms-workload-tests.yaml` from `test/v1/` |
+| `driver` | Regenerates `config/manifests/41-kms-workload-tests.yaml` and the client pod's test mounts from `test/v1/main/` |
 | `k3s` | Starts local k3s |
 | `load` | Imports the images the manifests use into k3s (runs `config` first) |
 | `up` / `down` | Deploys / deletes the manifests on k3s (`up` runs `config` first) |
-| `test` | Runs the test commands in the client pod: keygen, driver, reshare, driver, recovery check |
+| `test` | Runs the test commands in the client pod (first keygen, every driver, recovery check) and writes `local/out/check/` |
+| `build-coverage` | Builds the local-only coverage variant of core-service (`<tag>-coverage`, never pushed) for `local/run-local.sh` |
 
 ## Image tags
 
@@ -68,24 +69,44 @@ make build load up test
 make down
 ```
 
+Local coverage run (no faults; see `scratchbook/coverage-setup.md`):
+
+```
+make build build-coverage     # after a SUT change
+local/run-local.sh <label> [seed]
+```
+
+It redeploys from scratch with the coverage build, runs the drivers for 8 minutes the way
+Test Composer would, and writes `local/out/<label>/coverage.lcov`. Run it with the `ENGINE`
+the images were built with (e.g. `ENGINE=docker`): it converts the profiles in the coverage
+tools image, which only that engine has.
+
 ## Launch
 
 From this folder, after `make push config` (and `make driver` before `config` if test scripts changed):
 
+snouty does not push the KMS images; `make push` does. Without it the run fails at setup
+with "could not resolve to a reachable image".
+
 ```
 snouty validate build/config
-snouty launch -w basic_k8s_test --config build/config \
-  --test-name kms-threshold \
-  --description "public_decrypt workload" \
-  --duration 30
+snouty launch --webhook advanced_k8s_test --config build/config \
+  --source kms --test-name kms/antithesis-poc-coverage \
+  --description "<what changed>" --duration 60 \
+  --param 'custom.container_faults_stop_exclusion_patterns=^kms-core-client,^minio-' \
+  --param 'custom.container_faults_kill_exclusion_patterns=^kms-core-client,^minio-' \
+  --param custom.vm_memory_mb=16384
 ```
+
+The exclusions keep pod stop and kill faults off the test driver and MinIO. 16 GiB of test
+VM memory avoids the "Peak memory usage" alert that the default VM size gave.
 
 ## After editing
 
 | You edited | Local | Antithesis |
 |---|---|---|
 | SUT code or `images/` | `make build load down up test` | `make build push config`, launch |
-| `test/v1/` scripts | `make driver down up test` (or the fast path below) | `make driver config`, launch |
+| `test/v1/main/` scripts | `make driver down up test` (or the fast path below) | `make driver config`, launch |
 | `config/manifests/` | `make down up test` | `make config`, launch |
 
 Fast path for test scripts, without redeploying the cores:

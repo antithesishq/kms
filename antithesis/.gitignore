@@ -1,1 +1,4 @@
 /build/
+/local/out/
+/local/antithesis/
+__pycache__/

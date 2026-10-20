@@ -3,198 +3,198 @@
     "guarantee": "guarantee-1",
     "property": "public-decrypt-returns-encrypted-plaintext",
     "type": "always",
-    "file": "antithesis/test/v1/public_decrypt/parallel_driver_public_decrypt.sh"
+    "file": "antithesis/test/v1/main/parallel_driver_pubdec_start.py"
   },
   "public decryption response from a KMS party fails authentication": {
     "guarantee": "guarantee-1",
     "property": "public-decrypt-returns-encrypted-plaintext",
     "type": "unreachable",
-    "file": "antithesis/test/v1/public_decrypt/parallel_driver_public_decrypt.sh"
+    "file": "antithesis/test/v1/main/parallel_driver_pubdec_start.py"
   },
   "public decryption succeeded with every party's response checked": {
     "guarantee": "guarantee-1",
     "property": "public-decrypt-returns-encrypted-plaintext",
     "type": "reachable",
-    "file": "antithesis/test/v1/public_decrypt/parallel_driver_public_decrypt.sh"
+    "file": "antithesis/test/v1/main/parallel_driver_pubdec_start.py"
   },
   "public decryption succeeded through the sync endpoint": {
     "guarantee": "guarantee-1",
     "property": "public-decrypt-returns-encrypted-plaintext",
     "type": "reachable",
-    "file": "antithesis/test/v1/public_decrypt/parallel_driver_public_decrypt.sh"
+    "file": "antithesis/test/v1/main/parallel_driver_pubdec_sync.py"
   },
   "batched public decryption succeeded": {
     "guarantee": "guarantee-1",
     "property": "public-decrypt-returns-encrypted-plaintext",
     "type": "reachable",
-    "file": "antithesis/test/v1/public_decrypt/parallel_driver_public_decrypt.sh"
+    "file": "antithesis/test/v1/main/parallel_driver_pubdec_start.py"
   },
   "public decryption succeeded with SnS left to the cores": {
     "guarantee": "guarantee-1",
     "property": "public-decrypt-returns-encrypted-plaintext",
     "type": "reachable",
-    "file": "antithesis/test/v1/public_decrypt/parallel_driver_public_decrypt.sh"
+    "file": "antithesis/test/v1/main/parallel_driver_pubdec_start.py"
   },
   "public decryption attempt ended without a verdict": {
     "guarantee": "guarantee-1",
     "property": "public-decrypt-returns-encrypted-plaintext",
     "type": "reachable",
-    "file": "antithesis/test/v1/public_decrypt/parallel_driver_public_decrypt.sh"
+    "file": "antithesis/test/v1/main/parallel_driver_pubdec_start.py"
   },
   "public decryption succeeded under a reshared epoch": {
     "guarantee": "guarantee-3",
     "property": "reshare-preserves-key",
     "type": "reachable",
-    "file": "antithesis/test/v1/public_decrypt/parallel_driver_public_decrypt.sh"
+    "file": "antithesis/test/v1/main/parallel_driver_pubdec_start.py"
   },
   "workload generated an FHE key": {
     "guarantee": null,
     "property": null,
     "type": "reachable",
-    "file": "antithesis/test/v1/public_decrypt/first_generate_key.sh"
+    "file": "antithesis/test/v1/main/first_generate_key.py"
   },
   "key reshare result from every KMS party matches the reshared key": {
     "guarantee": "guarantee-3",
     "property": "reshare-preserves-key",
     "type": "always",
-    "file": "antithesis/test/v1/public_decrypt/anytime_reshare_key.sh"
+    "file": "antithesis/test/v1/main/parallel_driver_epoch_reshare.py"
   },
   "key reshare succeeded from an epoch that a reshare created": {
     "guarantee": "guarantee-3",
     "property": "reshare-preserves-key",
     "type": "reachable",
-    "file": "antithesis/test/v1/public_decrypt/anytime_reshare_key.sh"
+    "file": "antithesis/test/v1/main/parallel_driver_epoch_reshare.py"
   },
   "key reshare attempt ended without a verdict": {
     "guarantee": "guarantee-3",
     "property": "reshare-preserves-key",
     "type": "reachable",
-    "file": "antithesis/test/v1/public_decrypt/anytime_reshare_key.sh"
+    "file": "antithesis/test/v1/main/parallel_driver_epoch_reshare.py"
   },
   "public decryption succeeded through three of the four cores": {
     "guarantee": "guarantee-1",
     "property": "public-decrypt-returns-encrypted-plaintext",
     "type": "reachable",
-    "file": "antithesis/test/v1/public_decrypt/parallel_driver_public_decrypt.sh"
+    "file": "antithesis/test/v1/main/parallel_driver_pubdec_start.py"
   },
   "public decryption succeeded on a retry after an attempt without a verdict": {
     "guarantee": "guarantee-1",
     "property": "public-decrypt-returns-encrypted-plaintext",
     "type": "sometimes",
-    "file": "antithesis/test/v1/public_decrypt/parallel_driver_public_decrypt.sh"
+    "file": "antithesis/test/v1/main/parallel_driver_pubdec_start.py"
   },
   "public decryption succeeded after the client left out a core it could not connect to": {
     "guarantee": "guarantee-1",
     "property": "public-decrypt-returns-encrypted-plaintext",
     "type": "sometimes",
-    "file": "antithesis/test/v1/public_decrypt/parallel_driver_public_decrypt.sh"
+    "file": "antithesis/test/v1/main/parallel_driver_pubdec_start.py"
   },
   "every core accepts client connections within 600 s after faults stop": {
     "guarantee": "guarantee-2",
     "property": "recovers-after-faults",
     "type": "always",
-    "file": "antithesis/test/v1/public_decrypt/eventually_recovers_after_faults.sh"
+    "file": "antithesis/test/v1/main/eventually_recovers_after_faults.py"
   },
   "public decryption answered by all four cores succeeds within 300 s of every core accepting connections": {
     "guarantee": "guarantee-2",
     "property": "recovers-after-faults",
     "type": "always",
-    "file": "antithesis/test/v1/public_decrypt/eventually_recovers_after_faults.sh"
+    "file": "antithesis/test/v1/main/eventually_recovers_after_faults.py"
   },
   "a core the client could not connect to after faults stopped accepted connections again": {
     "guarantee": "guarantee-2",
     "property": "recovers-after-faults",
     "type": "sometimes",
-    "file": "antithesis/test/v1/public_decrypt/eventually_recovers_after_faults.sh"
+    "file": "antithesis/test/v1/main/eventually_recovers_after_faults.py"
   },
   "public decryption answered by all four cores succeeded after a failed first attempt once faults stopped": {
     "guarantee": "guarantee-2",
     "property": "recovers-after-faults",
     "type": "sometimes",
-    "file": "antithesis/test/v1/public_decrypt/eventually_recovers_after_faults.sh"
+    "file": "antithesis/test/v1/main/eventually_recovers_after_faults.py"
   },
   "public decryption under a reshared epoch carries the encrypted plaintext": {
     "guarantee": "guarantee-3",
     "property": "reshare-preserves-key",
     "type": "always_or_unreachable",
-    "file": "antithesis/test/v1/public_decrypt/parallel_driver_public_decrypt.sh"
+    "file": "antithesis/test/v1/main/parallel_driver_pubdec_start.py"
   },
   "public key that every party publishes for a key is unchanged by a reshare": {
     "guarantee": "guarantee-3",
     "property": "reshare-preserves-key",
     "type": "always",
-    "file": "antithesis/test/v1/public_decrypt/anytime_reshare_key.sh"
+    "file": "antithesis/test/v1/main/parallel_driver_epoch_reshare.py"
   },
   "public key read back unchanged after a reshare that ended without a verdict": {
     "guarantee": "guarantee-3",
     "property": "reshare-preserves-key",
     "type": "sometimes",
-    "file": "antithesis/test/v1/public_decrypt/anytime_reshare_key.sh"
+    "file": "antithesis/test/v1/main/parallel_driver_epoch_reshare.py"
   },
   "public decryption under a reshare's source epoch carries the encrypted plaintext after the reshare": {
     "guarantee": "guarantee-3",
     "property": "reshare-preserves-key",
     "type": "always",
-    "file": "antithesis/test/v1/public_decrypt/anytime_reshare_key.sh"
+    "file": "antithesis/test/v1/main/parallel_driver_epoch_reshare.py"
   },
   "public decryption under the source epoch succeeded after a reshare that ended without a verdict": {
     "guarantee": "guarantee-3",
     "property": "reshare-preserves-key",
     "type": "sometimes",
-    "file": "antithesis/test/v1/public_decrypt/anytime_reshare_key.sh"
+    "file": "antithesis/test/v1/main/parallel_driver_epoch_reshare.py"
   },
   "user decryption reconstructs the encrypted plaintext": {
     "guarantee": "guarantee-4",
     "property": "user-decrypt-returns-encrypted-plaintext",
     "type": "always",
-    "file": "antithesis/test/v1/public_decrypt/parallel_driver_user_decrypt.sh"
+    "file": "antithesis/test/v1/main/parallel_driver_userdec_start.py"
   },
   "user decryption under a reshared epoch reconstructs the encrypted plaintext": {
     "guarantee": "guarantee-3",
     "property": "reshare-preserves-key",
     "type": "always_or_unreachable",
-    "file": "antithesis/test/v1/public_decrypt/parallel_driver_user_decrypt.sh"
+    "file": "antithesis/test/v1/main/parallel_driver_userdec_start.py"
   },
   "user decryption succeeded on a retry after an attempt without a verdict": {
     "guarantee": "guarantee-4",
     "property": "user-decrypt-returns-encrypted-plaintext",
     "type": "sometimes",
-    "file": "antithesis/test/v1/public_decrypt/parallel_driver_user_decrypt.sh"
+    "file": "antithesis/test/v1/main/parallel_driver_userdec_start.py"
   },
   "user decryption succeeded under a reshared epoch": {
     "guarantee": "guarantee-4",
     "property": "user-decrypt-returns-encrypted-plaintext",
     "type": "sometimes",
-    "file": "antithesis/test/v1/public_decrypt/parallel_driver_user_decrypt.sh"
+    "file": "antithesis/test/v1/main/parallel_driver_userdec_start.py"
   },
   "batched user decryption succeeded": {
     "guarantee": "guarantee-4",
     "property": "user-decrypt-returns-encrypted-plaintext",
     "type": "sometimes",
-    "file": "antithesis/test/v1/public_decrypt/parallel_driver_user_decrypt.sh"
+    "file": "antithesis/test/v1/main/parallel_driver_userdec_start.py"
   },
   "user decryption succeeded through the sync endpoint": {
     "guarantee": "guarantee-4",
     "property": "user-decrypt-returns-encrypted-plaintext",
     "type": "reachable",
-    "file": "antithesis/test/v1/public_decrypt/parallel_driver_user_decrypt.sh"
+    "file": "antithesis/test/v1/main/parallel_driver_userdec_sync.py"
   },
   "user decryption succeeded with every party's response collected": {
     "guarantee": "guarantee-4",
     "property": "user-decrypt-returns-encrypted-plaintext",
     "type": "reachable",
-    "file": "antithesis/test/v1/public_decrypt/parallel_driver_user_decrypt.sh"
+    "file": "antithesis/test/v1/main/parallel_driver_userdec_start.py"
   },
   "user decryption succeeded with SnS left to the cores": {
     "guarantee": "guarantee-4",
     "property": "user-decrypt-returns-encrypted-plaintext",
     "type": "reachable",
-    "file": "antithesis/test/v1/public_decrypt/parallel_driver_user_decrypt.sh"
+    "file": "antithesis/test/v1/main/parallel_driver_userdec_start.py"
   },
   "user decryption attempt ended without a verdict": {
     "guarantee": "guarantee-4",
     "property": "user-decrypt-returns-encrypted-plaintext",
     "type": "reachable",
-    "file": "antithesis/test/v1/public_decrypt/parallel_driver_user_decrypt.sh"
+    "file": "antithesis/test/v1/main/parallel_driver_userdec_start.py"
   }
 }

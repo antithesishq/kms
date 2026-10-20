@@ -4,7 +4,7 @@
 #
 #   core-service        kms-server, kms-gen-keys, kms-init (insecure flavour)
 #   core-service-probe  core-service plus grpc_health_probe, for the init Job
-#   core-client         kms-core-client, which hosts the test commands
+#   core-client         kms-core-client and Python, which host the test commands
 #   init-envsubst       the cores' config-rendering init container
 #
 #   antithesis/images/build.sh
@@ -59,6 +59,7 @@ BINARIES_IMAGE="localhost/kms-antithesis/kms-binaries:intermediate"
 ZAMA_CORE_IMAGE="localhost/kms-antithesis/zama-core-service:intermediate"
 ZAMA_PROBE_IMAGE="localhost/kms-antithesis/zama-core-service-probe:intermediate"
 ZAMA_CLIENT_IMAGE="localhost/kms-antithesis/zama-core-client:intermediate"
+CLIENT_PYTHON_IMAGE="localhost/kms-antithesis/core-client-python:intermediate"
 
 CORE_IMAGE="${REG}/kms/core-service:${TAG}"
 PROBE_IMAGE="${REG}/kms/core-service-probe:${TAG}"
@@ -148,6 +149,13 @@ step "core-client (prod, EXPECTED_KMS_FLAVOR=insecure)"
     --build-arg EXPECTED_KMS_FLAVOR=insecure \
     "${KMS_SRC}"
 
+# Python and the Antithesis Python SDK, for the test commands in test/v1/main/.
+step "core-client + python"
+"${ENGINE}" build -t "${CLIENT_PYTHON_IMAGE}" \
+    -f "${HERE}/python.Dockerfile" \
+    --build-arg BASE_IMAGE="${ZAMA_CLIENT_IMAGE}" \
+    "${HERE}"
+
 # symbols.Dockerfile on top of each, so Antithesis can symbolize coverage.
 symbols() {  # <zama image> <final image> <bin dir>
     step "symbols: $(basename "${2%:*}")"
@@ -159,7 +167,7 @@ symbols() {  # <zama image> <final image> <bin dir>
 }
 symbols "${ZAMA_CORE_IMAGE}" "${CORE_IMAGE}" /app/kms/core/service/bin
 symbols "${ZAMA_PROBE_IMAGE}" "${PROBE_IMAGE}" /app/kms/core/service/bin
-symbols "${ZAMA_CLIENT_IMAGE}" "${CLIENT_IMAGE}" /app/kms-core-client/bin
+symbols "${CLIENT_PYTHON_IMAGE}" "${CLIENT_IMAGE}" /app/kms-core-client/bin
 
 step "init-envsubst"
 "${ENGINE}" build -t "${ENVSUBST_IMAGE}" \
