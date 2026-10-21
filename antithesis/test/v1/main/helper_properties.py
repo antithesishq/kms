@@ -196,7 +196,7 @@ def judge_public_decrypt(rc, out, details, markers=True):
     unauthenticated result), args (the command line was malformed) or no_verdict (a timeout,
     a transport error, or cores that answered with errors; expected under faults).
     markers=False evaluates only the safety checks, for the recovery probe."""
-    reshared = details.get("epoch_status", "default") != "default"
+    reshared = details.get("epoch_status") in ("confirmed", "unconfirmed")
     if rc == 0:
         d = dict(details, request_id=request_id_from(out))
         always(MSG_PLAINTEXT, True, d)
@@ -249,7 +249,7 @@ def judge_user_decrypt(rc, out, details):
     """Evaluate Guarantee 4 on one user-decrypt run. Same return values as
     judge_public_decrypt. Every error other than the result mismatch is the guarantee's
     "or an error" side, and is not a violation."""
-    reshared = details.get("epoch_status", "default") != "default"
+    reshared = details.get("epoch_status") in ("confirmed", "unconfirmed")
     if rc == 0:
         d = dict(details, request_id=request_id_from(out))
         always(MSG_USER_PLAINTEXT, True, d)

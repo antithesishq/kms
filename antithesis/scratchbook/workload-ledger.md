@@ -34,7 +34,7 @@ from [api-surface.md](api-surface.md). One row per local iteration and one per A
 | 26 | 2026-10-21 | — (12 h bug hunt, at the user's request: row 22's workload, commit `cbf829e4`, the newest one validated on Antithesis, under row 24's aggressive faults) | 0, 1, 2, 3 | — | `1aa9f98df97398fabc1b8e4ca66a0daa-64-4` (720 min, turbo; pod stop and kill every ~120 s each, strobing, timing fuzzing) | pending | |
 | 25 | 2026-10-21 | iter15 (input review, candidate 3): per-container budgets paced per timeline (`paced`: all at once, or one slot every 120 or 300 s) for keys, keygen abort runs, CRS requests, CRS abort runs and PRSS epochs; the PRSS-epoch budget no longer counts live epochs twice | 0, 1, 2, 3 | +389 / −15 lines over iter14 (16,108 / 3,170 merged; seeds 13,305–15,797, a wide spread from the per-timeline switches) | — | — | kept. Generation still happens in every seed (4–9 keygens, 3–6 insecure CRS, 3–12 cancelled keygens, 8–12 cancelled CRS generations). No false Always/Unreachable. The gain locally is small by nature: the change is for Antithesis branches that start late in a run |
 | 27 | 2026-10-21 | iter16 (input review, candidate 5): keygen from an existing keyset (`--existing-keyset-id`, half the time `--use-existing-key-tag`, 3 in 10 compressed ones `--copy-compressed-key-to-original`), in a per-timeline share of keygens (0/20/50 %), with its own budget of 3 fresh preprocessing IDs per container. The reshare driver now reads the public keys inside its lifecycle lock: a copy-back replaces an existing key's public material, and outside the lock that could fail Guarantee 3's check on a correct system | 0, 1, 2, 3 | +436 lines over iter15 (16,398 / 3,191 merged; seeds 15,413–15,938): rebuilding a keyset from existing shares (`tfhe_internals/test_feature.rs` +278, `key_generator.rs` +101), `keyset_configuration.rs` | — | — | kept. 3 existing-keyset keygens in one seed: the compressed one succeeded, the two uncompressed ones ended `INTERNAL` as documented ("only supported for compressed keysets"). Checked by hand: all three flag combinations succeed, and after a copy-back, public and user decryptions under the original key still return the encrypted values. No false Always/Unreachable. Two earlier versions reached nothing: one sent the flags on spent preprocessing IDs (they fail first), one only on fresh ones within the key cap (too few) |
-| 28 | 2026-10-21 | — (Antithesis run of rows 25 and 27, commit `a34e1371`) | 0, 1, 2, 3 | — | `4d31ac7b71d37b2cf0e6f8e8ac0fb146-64-4` (60 min, turbo, default faults) | pending | validation before long runs |
+| 28 | 2026-10-21 | — (Antithesis run of rows 25 and 27, commit `a34e1371`) | 0, 1, 2, 3 | — | `4d31ac7b71d37b2cf0e6f8e8ac0fb146-64-4` (60 min, turbo, default faults) | no coverage export (turbo) | validation before long runs. 83 properties pass. Failing: Guarantee 2's "public decryption answered by all four cores succeeds within 300 s…" (50) and its command's exit code, a suspected SUT finding, not caused by the workload (Status, 2026-10-21, stall after a core restart); the known container exits (exit 1: 1,836; exit 101: 26; init: 122). So rows 25 and 27 add no false positive |
 | 29 | 2026-10-21 | iter17 (input review, candidate 2): keygens and CRS generations in a PRSS-only or confirmed reshared epoch, in a per-timeline share (0/20/40 %; `generation_epoch`), with their own budgets (3 keygens, 2 insecure CRSes per container). Keys and CRSes record their home epoch; decryptions use a key's home as its default epoch, reshares start from it, existing-keyset keygens and CRS re-signing stay within one epoch, and the recovery check only uses keys born in the kms-init epoch (a key born in a destroyed epoch would otherwise fail Guarantee 2 on a correct system) | 0, 1, 2, 3 | +312 lines over iter16 (16,690 / 3,236 merged; seeds 15,001–16,434; seeds 4–6): key material stored under other epochs (`crypto_material/threshold.rs` +120), `key_generator.rs`, `epoch_manager.rs`, signing | — | — | kept. 7–9 completed keygens per seed, 2 valid CRS generations in other epochs in two seeds. No false Always/Unreachable. A first version (iter17a, seeds 1–3) shared the key and CRS budgets, which are spent before other epochs exist: only spent or invalid requests went to other epochs |
 
 ## How this workload differs from the skill's defaults
@@ -135,6 +135,25 @@ These were the user's instructions when the workload was started (2026-10-19):
   (`tokio::join!`), with no order or rollback, and boot treats a CrsInfo without its public
   CRS as fatal. `write_crs` serves the secure ceremony too. Not a workload false positive:
   no caller rule was broken (no epoch change ran; CRS generation was one at a time).
+- 2026-10-21, suspected SUT finding in `4d31ac7b…` (Guarantee 2, decryption bound; medium
+  confidence, no root cause yet): decryptions stall on a core that just restarted, although
+  the code under test has upstream's fix for that (`a51d30be`, HTTP/2 keepalive, #887). In the
+  counterexample (input_hash 4452306308432722739, vtime 861.47) kms-core-4 restarted at vtime
+  562, as the eventually phase began, and booted normally (no recovery or degraded mode). The
+  recovery check connected to every core at once, then its 3 attempts (561, 661, 761) each
+  timed out at 90 s: cores 1–3 completed all 3 sessions, kms-core-4 started all of them and
+  completed none. That is the signature of the speedrun's control, `decryption-stalls-after-
+  core-restart` (rca/), where peers kept dead connections to the restarted core; with the
+  keepalive they should reconnect within seconds. The peers log nothing about connections at
+  INFO level, so the logs can't show the mechanism. Not the workload: no existing-keyset
+  keygen ran in that timeline, and unlike `recovery-check-attempt-outlives-timeout` the other
+  cores kept working. Next: the multiverse debugger at that moment (antithesis-debug), or
+  more counterexamples from the 12 h run.
+- 2026-10-21, relation to the speedrun's findings: the degraded-mode finding of `c7dcf08a…`
+  (MPC contexts unreadable at boot → "degraded mode", `kms_impl.rs:864`) is the same class as
+  `storage-error-enters-recovery-mode` (rca/), but a different read: that one is the signing
+  key (`backup_operator.rs`), and its proposed patch touches only `backup_operator.rs`, so it
+  doesn't cover the context path.
 - 2026-10-21: input review (`antithesis-review-inputs`, after iter11). Candidates, in its order:
   (1) per-timeline enable masks and weights, so drivers that undo each other (reshare and
   destroy, abort and decrypt) don't always run together; (2) keygen, CRS and preprocessing
@@ -144,7 +163,12 @@ These were the user's instructions when the workload was started (2026-10-19):
   only meet finished CRSes); (5) keygen from an existing keyset (`--existing-keyset-id`,
   `--use-existing-key-tag`); (6) a few requests on destroyed, PRSS-only or rejected epochs, and
   some reshares without the source-epoch lock; (7) up to 2 new epochs at once in some
-  timelines. It also found the random epoch IDs, fixed in iter12.
+  timelines. It also found the random epoch IDs, fixed in iter12. Done: (1) iter13, (3) iter15,
+  (4) iter14, (5) iter16, (2) iter17, (6) the part that sends decryptions to destroyed or
+  PRSS-only epochs, iter18. Not done: (7), because the proto also wants epoch IDs in increasing
+  order and the CLI sends and polls in one command, so two concurrent new epochs could reach a
+  core out of order; and the part of (6) that drops the source-epoch lock, since destroying a
+  reshare's source while the source check decrypts under it breaks the destroy caller rule.
 - 2026-10-20: every operation of api-surface.md has a driver except those that need a harness
   change, which is the user's decision (not this skill's):
   - `context.create` and `context.destroy` (`mpc-admin`): the request is a safe-serialized
@@ -220,4 +244,4 @@ These were the user's instructions when the workload was started (2026-10-19):
 
 ## Tried and didn't help
 
-None yet.
+- iter18 (2026-10-21): decryptions sent to destroyed or PRSS-only epochs in a per-timeline share (0/3/10 %; input review, candidate 6). In 3 seeds not one such decryption happened (the draws came out 0 % or never fired), so it reached nothing; reverted. The decryption judges keep the stricter test of a reshared epoch (`epoch_status` confirmed or unconfirmed), which behaves the same without it.
