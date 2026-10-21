@@ -149,6 +149,16 @@ These were the user's instructions when the workload was started (2026-10-19):
   concurrent migrations or describe partial failure. The same key decrypted fine at vtime
   397, before the copies. This failure will dominate Guarantee 2 in timelines where it
   happens: the probe key is the first key, which the existing-keyset keygen also picks.
+  Reproduced locally without faults or concurrency (`local/repro-key-migration-split.sh`,
+  2026-10-21): one migration of the first key while core 3 was scaled to 0, then core 3
+  back. Before, the key decrypted through all four cores and through each three-core
+  subset tried (without 4, without 1, without 3). After, four cores still decrypted, by
+  correcting core 3's share ("Share of party 3 (at index 2) is invalid after iteration 0"
+  on every core); cores 1, 2, 4 decrypted; cores 1, 2, 3 and cores 2, 3, 4 never answered:
+  robust open waited for the missing core's share for 30 min ("Sender 4 timed out"), then
+  failed "Could not reconstruct the sharing". So one migration with one core down silently
+  spends the key's tolerance of a core failure, and a second deviation (as in the run) loses
+  the key.
 - 2026-10-21, the CRS-write brick of `43b32297…` (below) also hits keys. In `d3355630…`
   (input_hash -4703883254626317498, vtime 1148.76) core 1 was killed (node stop, vtime 453.3)
   while it stored key `6bdc…`: its `FheKeyInfo` write had started, its `PublicKey` write
