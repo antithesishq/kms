@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""Reshares one or two keys every core holds into a fresh epoch (kms-core-client new-epoch),
-from the kms-init epoch (re-signing its CRSes half the time) or one a reshare created, while
-decryptions run. Then Guarantee 3's checks: each key's public key is unchanged on every party,
-and the source epoch still decrypts. The new epoch is recorded for the decryption drivers. One
-reshare at a time (each takes every core's CPU), and no keygen or keygen abort meanwhile."""
+"""Reshares 1-2 keys into a fresh epoch from the kms-init epoch (re-signing CRSes half the time)
+or a reshared one, then runs Guarantee 3's checks. One new epoch at a time; no keygen meanwhile."""
 import sys
 
 from helper_common import (DEFAULT_CONTEXT_ID, DEFAULT_EPOCH_ID, MAX_EPOCHS, cli_outcome, enter_scratch_dir,
-                           exclusive, lifecycle, log_outcome, new_epoch_id, pick, pool, record, run_cli)
+                           epoch_in_use, exclusive, exit_unless_active, lifecycle, log_outcome, new_epoch_id, pick,
+                           pool, record, run_cli)
 from helper_properties import declare_catalog, judge_public_key, judge_reshare
 from helper_reshare import (check_source_epoch, pick_crs_to_resign, plan_reshare, previous_epoch_params,
                             public_key_digests, wait_epoch_settled)
@@ -15,13 +13,13 @@ from helper_reshare import (check_source_epoch, pick_crs_to_resign, plan_reshare
 OP = "epoch.reshare"
 
 declare_catalog()
+exit_unless_active(OP, "epoch_reshare", 80)
 plan = plan_reshare() if len(pool("epochs")) < MAX_EPOCHS else None
 if plan is None:
     log_outcome(OP, "skipped=no_key_or_max_epochs")
     sys.exit(0)
 keys, source_epoch = plan
 crs = pick_crs_to_resign() if source_epoch == DEFAULT_EPOCH_ID else []
-new_epoch = new_epoch_id()
 enter_scratch_dir()
 previous = previous_epoch_params(keys, source_epoch, crs)
 if previous is None:
@@ -29,10 +27,12 @@ if previous is None:
     sys.exit(0)
 key_ids = [k for k, _ in keys]
 before = {k: public_key_digests(k) for k in key_ids}
-with exclusive("reshare") as alone, lifecycle("epoch", wait=300 if alone else 0) as held:
-    if not (alone and held):
-        log_outcome(OP, "skipped=reshare_or_generation_running")
+with exclusive("new-epoch") as alone, epoch_in_use(source_epoch) as usable, \
+        lifecycle("epoch", wait=300 if alone and usable else 0) as held:
+    if not (alone and usable and held):
+        log_outcome(OP, "skipped=epoch_busy_or_generation_running")
         sys.exit(0)
+    new_epoch = new_epoch_id()
     rc, out = run_cli(["--max-iter", 1200, "new-epoch", "--new-epoch-id", new_epoch, "--new-context-id",
                        DEFAULT_CONTEXT_ID, "--previous-epoch-params", previous], timeout=900)
     log_outcome(OP, cli_outcome(rc, out))

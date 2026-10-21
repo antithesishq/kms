@@ -6,10 +6,10 @@ key shares too. Not a command; Test Composer skips helper_ files.
 """
 import sys
 
-from helper_common import (chance, cli_connected, cli_outcome, cli_unreached_party, decrypt_args,
-                           enter_scratch_dir, log_outcome, pick, pick_count, pick_decrypt_inputs, pick_epoch,
-                           pick_key, record, request_id_from, run_cli, sleep, timeline_choice,
-                           write_client_config)
+from helper_common import (DEFAULT_EPOCH_ID, chance, cli_connected, cli_outcome, cli_unreached_party,
+                           decrypt_args, enter_scratch_dir, epoch_in_use, log_outcome, pick, pick_count,
+                           pick_decrypt_inputs, pick_epoch, pick_key, record, request_id_from, run_cli, sleep,
+                           timeline_choice, write_client_config)
 from helper_properties import declare_catalog, judge_public_decrypt, judge_user_decrypt
 
 
@@ -34,8 +34,11 @@ def public_decrypts(op, sync):
         all_parties = left_out is None and chance(all_parties_pct)
         inputs = pick_decrypt_inputs()
         epoch_id, epoch_status = pick_epoch(key_id)
-        rc, out = run_cli(decrypt_args("public-decrypt", key_id, inputs, all_parties, sync=sync, epoch_id=epoch_id),
-                          timeout=300)
+        with epoch_in_use(epoch_id) as usable:
+            if not usable:
+                epoch_id, epoch_status = DEFAULT_EPOCH_ID, "default"
+            rc, out = run_cli(decrypt_args("public-decrypt", key_id, inputs, all_parties, sync=sync,
+                                           epoch_id=epoch_id), timeout=300)
         log_outcome(op, cli_outcome(rc, out))
         details = dict(inputs, key_id=key_id, epoch_id=epoch_id, epoch_status=epoch_status, all_parties=all_parties,
                        left_out=left_out, sync=sync, call=call, after_failed_call=after_failed_call,
@@ -72,8 +75,11 @@ def user_decrypts(op, sync):
         all_parties = chance(all_parties_pct)
         inputs = pick_decrypt_inputs()
         epoch_id, epoch_status = pick_epoch(key_id)
-        rc, out = run_cli(decrypt_args("user-decrypt", key_id, inputs, all_parties, sync=sync, epoch_id=epoch_id),
-                          timeout=300)
+        with epoch_in_use(epoch_id) as usable:
+            if not usable:
+                epoch_id, epoch_status = DEFAULT_EPOCH_ID, "default"
+            rc, out = run_cli(decrypt_args("user-decrypt", key_id, inputs, all_parties, sync=sync,
+                                           epoch_id=epoch_id), timeout=300)
         log_outcome(op, cli_outcome(rc, out))
         details = dict(inputs, key_id=key_id, epoch_id=epoch_id, epoch_status=epoch_status, all_parties=all_parties,
                        sync=sync, call=call, after_failed_call=after_failed_call, exit_code=rc)

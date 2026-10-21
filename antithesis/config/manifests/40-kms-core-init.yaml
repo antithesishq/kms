@@ -110,6 +110,12 @@ spec:
         - mountPath: /opt/antithesis/test/v1/main/parallel_driver_crs_start_insecure.py
           subPath: parallel_driver_crs_start_insecure.py
           name: workload-tests
+        - mountPath: /opt/antithesis/test/v1/main/parallel_driver_epoch_create.py
+          subPath: parallel_driver_epoch_create.py
+          name: workload-tests
+        - mountPath: /opt/antithesis/test/v1/main/parallel_driver_epoch_destroy.py
+          subPath: parallel_driver_epoch_destroy.py
+          name: workload-tests
         - mountPath: /opt/antithesis/test/v1/main/parallel_driver_epoch_get_result.py
           subPath: parallel_driver_epoch_get_result.py
           name: workload-tests

@@ -7,11 +7,12 @@ in 10, and whenever another CRS generation is in flight or the CRS budget is spe
 runs (lifecycle)."""
 import sys
 
-from helper_common import (cli_outcome, crs_request_allowed, enter_scratch_dir, exclusive, lifecycle, log_outcome,
-                           pick_crs_bits, record, request_id_from, run_cli)
+from helper_common import (cli_outcome, crs_request_allowed, enter_scratch_dir, exclusive, exit_unless_active,
+                           lifecycle, log_outcome, pick_crs_bits, record, request_id_from, run_cli)
 
 OP = "crs.start_insecure"
 
+exit_unless_active(OP, "crs_start_insecure", 60)
 enter_scratch_dir()
 with lifecycle("generate", wait=120) as held, exclusive("crs-generation") as alone:
     if not held:

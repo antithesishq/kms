@@ -23,7 +23,11 @@ from [api-surface.md](api-surface.md). One row per local iteration and one per A
 | 14 | 2026-10-20 | iter08: Tier 3 `material.list` and the `request-status` group (`metastore.get_statuses`, `metastore.list`, `metastore.info`), read-only gRPC with hand-encoded requests: pooled, unknown and malformed IDs, every store type and one that doesn't exist, status filters, page sizes around the 1000 cap, valid and unparsable page tokens | 0, 1, 2 (`reshare`, `crs`), 3 (`material.list`, `request-status`) | +269 lines / +148 functions over iter07 (15,845 / 3,118 merged; seeds 15,668–15,726): `metastore_status_service.rs` (150 lines), the meta-store listing accessors, key-material availability | — | — | kept. ~2,900 driver runs per seed; ~45 % of `metastore.list` calls are `INVALID_ARGUMENT` by design. No false Always/Unreachable |
 | 15 | 2026-10-20 | iter09: `epoch.reshare` inputs not used yet: two keys in one request (1 time in 3), re-signing 1–2 CRSes when resharing from the kms-init epoch (half the time; digest over `PDAT_CRS`), a chained source's own keys; `MAX_EPOCHS` 6 → 12, since the faster build reached 6 within a minute; epoch records list all their keys | 0, 1, 2 (`reshare`, `crs`), 3 (`material.list`, `request-status`) | +91 lines / +18 functions over iter08 (15,936 / 3,136 merged; seeds 15,816–15,936), none lost: CRS verification and re-signing in a reshare (`reshare_utils.rs`, `epoch_manager.rs`), threshold crypto-material storage | — | — | kept. 12–13 reshares per seed, 2–3 of them with two keys, 1–4 re-signing CRSes; every Guarantee 3 check true |
 | 16 | 2026-10-20 | iter10: fix for the turbo false positive of row 13: one CRS generation of either kind in flight (`exclusive("crs-generation")`), at most `MAX_CRS_REQUESTS` = 10 valid CRS requests per container, one reshare in flight, lifecycle waits 600/300 s → 120 s for keygen, abort and CRS drivers | 0, 1, 2 (`reshare`, `crs`), 3 (`material.list`, `request-status`) | +6 lines / +1 function over iter09 (15,942 / 3,136 merged): no loss from the limits | — | — | kept. 6 valid CRS requests per seed (2 ceremonies, 4 insecure), 12 reshares, 1–9 reshares skipped while another ran. No false Always/Unreachable |
-| 17 | 2026-10-20 | — (Antithesis run of rows 14–16) | 0, 1, 2 (`reshare`, `crs`), 3 (`material.list`, `request-status`) | — | `97ed35045ae50ed898fdb0b28edc5889-64-4` (60 min, turbo, otherwise as row 3) | pending | |
+| 17 | 2026-10-20 | — (Antithesis run of rows 14–16) | 0, 1, 2 (`reshare`, `crs`), 3 (`material.list`, `request-status`) | — | `97ed35045ae50ed898fdb0b28edc5889-64-4` (60 min, turbo, otherwise as row 3) | no coverage export, as in row 13 (turbo runs carry only `environment` in `.results`) | 82 properties pass: every catalog assertion, Guarantee 2's two fault-timing `Sometimes` too; the turbo connect false positive of row 13 is gone. Failing: only the known fail-fast exits (kms-core exit 1: 1,245; kms-core-init-gen-keys exit 1: 72). The degraded-mode finding didn't recur in this run |
+| 18 | 2026-10-20 | iter11: Tier 3 `mpc-admin` epochs: `epoch.create` (PRSS-only, at most 3 alive and 8 made, 1 in 10 an existing ID), `epoch.destroy` (an epoch the workload made, a reshared one only while more than 2 are left, never the kms-init epoch; sometimes destroyed or unknown IDs). The proto asks callers not to destroy an epoch while requests on it run, so commands hold a shared lock on the reshared epoch they decrypt or reshare under (`epoch_in_use`) and the destroy driver takes it exclusively after moving the epoch out of the pools; new epochs (reshare, create) one at a time | 0, 1, 2 (`reshare`, `crs`), 3 (`material.list`, `request-status`, `mpc-admin` epochs) | +178 lines / +34 functions over iter10 (16,120 / 3,169 merged; seeds 15,992–16,112), none lost: epoch destruction in `epoch_manager.rs` and `session.rs`, the storage deletes | — | — | kept. 25–31 epochs destroyed and 7–8 created per seed; reshares went from 12 to 29–33 per seed, since destroyed epochs free the cap. Driver runs ~1,400 per seed (reshares take every core's CPU). No false Always/Unreachable |
+| 19 | 2026-10-21 | iter12: epoch IDs in increasing order (`new_epoch_id` counter, taken inside `exclusive("new-epoch")`, which the rejected-reshare driver now holds too), as `NewMpcEpochRequest` requires | 0, 1, 2 (`reshare`, `crs`), 3 (`material.list`, `request-status`, `mpc-admin` epochs) | −7 lines / −1 function against iter11 (16,113 / 3,168 merged): noise | — | — | kept: required by the API. Every epoch ID sent came from the counter; 30–34 reshares, 26–32 destroys and 6–8 creates per seed. No false Always/Unreachable |
+| 20 | 2026-10-21 | iter13 (input review, candidate 1): per-timeline variation. Drivers that undo each other run only in some timelines (`exit_unless_active`: destroy 50 %, aborts, rejected reshares, epoch create and CRS 60 %, keygen and reshare 80 %); per-timeline mixes for decryption epochs, request-ID noise (10/35/70 %), the largest batch (1, 3 or 6; was always ≤ 3) and uncompressed keygens (0/25/75 %) | 0, 1, 2, 3 | merged over 3 seeds: +27 / −172 lines against iter12 (15,968 / 3,142); per seed 13,088 (reshare and both CRS drivers off), 15,906, 15,903. Batches of 4–6 reached a little more of the networking code; insecure CRS generation was off in all three seeds (a 6 % draw), which lost the CRS paths | (turbo, row 21) | — | kept, on the review's reasoning: Antithesis starts many timelines from the setup snapshot, each drawing its own mix, which 3 local timelines can't show. Its Antithesis effect isn't measured, since turbo runs export no coverage. No false Always/Unreachable |
+| 21 | 2026-10-21 | — (Antithesis run of rows 18–20) | 0, 1, 2, 3 | — | `43b322977f3b2643964277fc89f81dc9-64-4` (60 min, turbo, otherwise as row 3) | pending | |
 
 ## How this workload differs from the skill's defaults
 
@@ -85,6 +89,12 @@ These were the user's instructions when the workload was started (2026-10-19):
   covered: a keygen the CLI gave up on (timeout) that still runs on a core. `InsecureKeyGen`
   isn't named by the insecure proto; it shares the keygen machinery, so it is treated like
   `KeyGen`. iter03 and iter04 were measured before this, with the overlap.
+- **Epoch IDs in order.** `NewMpcEpochRequest` (kms.v1.proto) requires every new epoch ID to be
+  greater than the previous one (big-endian), and a core picks a key's and a CRS's latest epoch
+  by ID at boot. Until iter12 the workload drew epoch IDs at random, so about half broke that
+  rule (found by the input review). Since iter12 they come from a counter (`new_epoch_id`) and
+  are taken inside `exclusive("new-epoch")`, which every driver that creates an epoch holds, so
+  requests reach the cores in ID order. Requests that must fail use `unknown_epoch_id`.
 - **Recovery check without a probe key.** If no key is published by all four parties (the
   first key needs only two cores to finish, so a fault during `first_generate_key.py` could
   leave it on fewer), the recovery check exits without evaluating its assertions. Their
@@ -106,6 +116,25 @@ These were the user's instructions when the workload was started (2026-10-19):
 
 ## Status
 
+- 2026-10-21: input review (`antithesis-review-inputs`, after iter11). Candidates, in its order:
+  (1) per-timeline enable masks and weights, so drivers that undo each other (reshare and
+  destroy, abort and decrypt) don't always run together; (2) keygen, CRS and preprocessing
+  under epochs other than kms-init's; (3) pace the per-container budgets (keys, abort runs,
+  CRS requests, PRSS epochs) over the run instead of spending them in the first minutes, so
+  later Antithesis branches still generate; (4) a CRS start-then-abort sequence (aborts now
+  only meet finished CRSes); (5) keygen from an existing keyset (`--existing-keyset-id`,
+  `--use-existing-key-tag`); (6) a few requests on destroyed, PRSS-only or rejected epochs, and
+  some reshares without the source-epoch lock; (7) up to 2 new epochs at once in some
+  timelines. It also found the random epoch IDs, fixed in iter12.
+- 2026-10-20: every operation of api-surface.md has a driver except those that need a harness
+  change, which is the user's decision (not this skill's):
+  - `context.create` and `context.destroy` (`mpc-admin`): the request is a safe-serialized
+    `ContextInfo`, which only a `kms-core-client` built with the `testing` feature writes
+    (`new-testing-mpc-context-file`); `new-mpc-context context-toml` is unimplemented. Destroying
+    the default context would end every other check, so `context.destroy` waits for
+    `context.create`.
+  - the `backup` group (custodian contexts, operator key, recovery, restore): needs a
+    `[backup_vault]` section in the core config, which the harness doesn't set.
 - 2026-10-20: the Antithesis runs after row 11 use the `turbo` performance tier
   (`antithesis.performance_tier=turbo`), at the user's request, to find more issues. Those up
   to row 11 ran on the standard tier; edge counts compare only within a tier, so the first

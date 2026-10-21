@@ -47,6 +47,10 @@ DEFAULT_EPOCH_ID = "08" + "0" * 61 + "1"
 #                       "confirmed" (every core reported it done) or "unconfirmed" (the CLI
 #                       failed, so some cores can hold the epoch and others not)
 #   epochs-rejected/<epoch_id>  epochs of reshare requests meant to fail; the file holds why
+#   epochs-prss/<epoch_id>      PRSS-only epochs parallel_driver_epoch_create.py made
+#   epochs-destroyed/<epoch_id> epochs parallel_driver_epoch_destroy.py took out of the pools
+#   epoch-locks/<epoch_id>      flock files: shared while a command decrypts or reshares under
+#                               the epoch, exclusive while it is destroyed (epoch_in_use)
 #   crs/<crs_id>        CRSes the CLI generated; the file holds "secure" or "insecure"
 #   crs-requests/<n>    one file per valid CRS generation request sent
 #   abort-runs/<id>     preprocessing IDs parallel_driver_keygen_abort_running.py used (its budget)
@@ -66,7 +70,6 @@ MAX_CRS = 6
 MAX_CRS_REQUESTS = 10
 
 DATA_TYPES = ["ebool", "euint8", "euint16", "euint32", "euint64", "euint128", "euint160", "euint256"]
-BATCH_SIZES = [1, 1, 1, 2, 3]
 
 
 def pick(options):
@@ -97,8 +100,12 @@ def pick_value(data_type):
 
 
 def pick_decrypt_inputs():
+    """A decryption's inputs. The largest batch is a per-timeline choice (1, 3 or 6); within
+    it, half the batches are single ciphertexts."""
     data_type = pick(DATA_TYPES)
-    return {"data_type": data_type, "value_hex": pick_value(data_type), "batch": pick(BATCH_SIZES),
+    max_batch = timeline_choice("max_batch", [1, 3, 3, 6])
+    batch = 1 if chance(50) else pick_count(1, max_batch)
+    return {"data_type": data_type, "value_hex": pick_value(data_type), "batch": batch,
             "no_compression": pick([False, False, False, True]),
             "no_precompute_sns": pick([False, False, False, True])}
 
@@ -122,15 +129,26 @@ def pick_crs_bits(valid=True):
 
 
 def pick_request_id(ids):
-    """A request ID for a result RPC: mostly one from the pool, sometimes an unknown one, and
-    sometimes a malformed or differently spelled one, from the request-ID limits in
-    api-surface.md (all-zero and short IDs are invalid; upper case and 0x are accepted)."""
-    kind = pick(["pool"] * 6 + ["fresh", "zero", "upper", "prefixed", "short"])
+    """A request ID for a result RPC: one from the pool, or an unknown one, or a malformed or
+    differently spelled one, from the request-ID limits in api-surface.md (all-zero and short
+    IDs are invalid; upper case and 0x are accepted). How often it is not a pooled ID is a
+    per-timeline choice: 10, 35 or 70 %."""
+    noise = timeline_choice("request_id_noise_pct", [10, 35, 70])
+    kind = pick(["fresh", "zero", "upper", "prefixed", "short"]) if chance(noise) else "pool"
     if not ids or kind == "fresh":
         return rand_hex(32)
     rid = pick(ids)
     return {"pool": rid, "zero": "0" * 64, "upper": rid.upper(), "prefixed": "0x" + rid,
             "short": rid[:-2]}[kind]
+
+
+def exit_unless_active(op, name, percent):
+    """Per timeline, a driver runs in percent of timelines and does nothing in the others, so
+    that operations that undo each other (aborts and keygens, destroys and reshares) don't
+    always run together. Logs the skip and exits when inactive."""
+    if not timeline_choice(f"active_{name}", [0] * (100 - percent) + [1] * percent):
+        log_outcome(op, "skipped=inactive_in_timeline")
+        raise SystemExit(0)
 
 
 def timeline_choice(name, options):
@@ -245,7 +263,27 @@ def key_count():
 
 
 def new_epoch_id():
-    """A random epoch ID. It starts with 08 like DEFAULT_EPOCH_ID, the prefix fhevm expects."""
+    """The next ID for an epoch to create. NewMpcEpochRequest (kms.v1.proto) requires every new
+    epoch ID to be greater than the previous one, as a big-endian integer, and a core picks a
+    key's and a CRS's latest epoch by ID at boot. So IDs come from a counter in STATE_DIR,
+    above the kms-init epoch (08…01) and with the 08 prefix fhevm expects. Callers that create
+    an epoch take the ID while they hold exclusive("new-epoch"), so requests go out in order."""
+    os.makedirs(STATE_DIR, exist_ok=True)
+    with open(f"{STATE_DIR}/epoch-counter", "a+") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        f.seek(0)
+        n = int(f.read().strip() or "1") + 1
+        f.seek(0)
+        f.truncate()
+        f.write(str(n))
+        f.flush()  # before the lock goes, or the next caller reads the old count
+        fcntl.flock(f, fcntl.LOCK_UN)
+    return f"08{n:062x}"
+
+
+def unknown_epoch_id():
+    """An epoch ID no core knows, for requests that must fail; it never names an epoch to
+    create, so it needn't be in order."""
     return "08" + rand_hex(31)
 
 
@@ -265,10 +303,12 @@ def epochs_of(key_id, status):
 
 
 def pick_epoch(key_id):
-    """(epoch ID, status) to decrypt under key_id: the kms-init epoch ("default") 2 times in 5,
-    a confirmed reshared epoch 2 in 5 and an unconfirmed one 1 in 5, falling back to the
-    default when there is no reshared epoch of the chosen kind."""
-    status = pick(["default", "default", "confirmed", "confirmed", "unconfirmed"])
+    """(epoch ID, status) to decrypt under key_id: the kms-init epoch ("default"), a confirmed
+    reshared epoch or an unconfirmed one, in a mix drawn per timeline (2:2:1, mostly default,
+    or mostly reshared), falling back to the default when there is no reshared epoch of the
+    chosen kind."""
+    mix = {0: [2, 2, 1], 1: [8, 1, 1], 2: [1, 3, 2]}[timeline_choice("epoch_mix", [0, 1, 2])]
+    status = pick(["default"] * mix[0] + ["confirmed"] * mix[1] + ["unconfirmed"] * mix[2])
     epochs = epochs_of(key_id, status) if status != "default" else []
     return (pick(epochs), status) if epochs else (DEFAULT_EPOCH_ID, "default")
 
@@ -329,6 +369,51 @@ def lifecycle(group, wait):
         finally:
             if held:
                 fcntl.flock(mine, fcntl.LOCK_UN)
+
+
+@contextlib.contextmanager
+def epoch_in_use(epoch_id):
+    """Hold a reshared epoch while a command decrypts or reshares under it, so that
+    parallel_driver_epoch_destroy.py doesn't destroy it meanwhile (the proto asks callers not
+    to destroy an epoch while requests on it run). Yields True while held; False, holding
+    nothing that matters, if the epoch is being destroyed or has left the pools. The kms-init
+    epoch is never destroyed, so it is always usable."""
+    if epoch_id == DEFAULT_EPOCH_ID:
+        yield True
+        return
+    os.makedirs(f"{STATE_DIR}/epoch-locks", exist_ok=True)
+    with open(f"{STATE_DIR}/epoch-locks/{epoch_id}", "a") as f:
+        try:
+            fcntl.flock(f, fcntl.LOCK_SH | fcntl.LOCK_NB)
+        except BlockingIOError:
+            yield False
+            return
+        try:
+            yield os.path.exists(f"{STATE_DIR}/epochs/{epoch_id}")
+        finally:
+            fcntl.flock(f, fcntl.LOCK_UN)
+
+
+@contextlib.contextmanager
+def epoch_exclusive(epoch_id, wait):
+    """The destroy side of epoch_in_use: an exclusive flock on the epoch, waiting at most wait
+    seconds for the commands using it to finish. Yields True while held, else False."""
+    os.makedirs(f"{STATE_DIR}/epoch-locks", exist_ok=True)
+    with open(f"{STATE_DIR}/epoch-locks/{epoch_id}", "a") as f:
+        deadline = time.monotonic() + wait
+        while True:
+            try:
+                fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    yield False
+                    return
+                time.sleep(1)
+        try:
+            yield True
+        finally:
+            fcntl.flock(f, fcntl.LOCK_UN)
 
 
 @contextlib.contextmanager

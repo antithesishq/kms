@@ -9,12 +9,13 @@ cores reject before any ceremony starts, as it does 1 time in 10 anyway. Never w
 reshare runs (lifecycle)."""
 import sys
 
-from helper_common import (cli_outcome, crs_request_allowed, enter_scratch_dir, exclusive, lifecycle, log_outcome,
-                           pick_crs_bits, pool_matching, record, request_id_from, run_cli)
+from helper_common import (cli_outcome, crs_request_allowed, enter_scratch_dir, exclusive, exit_unless_active,
+                           lifecycle, log_outcome, pick_crs_bits, pool_matching, record, request_id_from, run_cli)
 
 OP = "crs.start"
 MAX_SECURE_CRS = 2
 
+exit_unless_active(OP, "crs_start", 60)
 enter_scratch_dir()
 with lifecycle("generate", wait=120) as held, exclusive("crs-generation") as alone:
     if not held:

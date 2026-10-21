@@ -5,11 +5,12 @@ one. Insecure keygens finish within seconds, so most calls answer NOT_FOUND. No 
 while a reshare runs (helper_common.lifecycle)."""
 import sys
 
-from helper_common import lifecycle, log_outcome, pick_count, pick_request_id, pool
+from helper_common import exit_unless_active, lifecycle, log_outcome, pick_count, pick_request_id, pool
 from helper_grpc import call_with_request_id, pick_core
 
 OP = "keygen.abort"
 
+exit_unless_active(OP, "keygen_abort", 60)
 ids = pool("preproc-taken") or pool("preproc")
 with lifecycle("generate", wait=120) as held:
     if not held:

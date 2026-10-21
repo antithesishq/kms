@@ -5,8 +5,8 @@ decryption under the source epoch afterwards. Not a command; Test Composer skips
 import hashlib
 
 from helper_common import (DEFAULT_CONTEXT_ID, DEFAULT_EPOCH_ID, STATE_DIR, chance, cli_connected,
-                           cli_unreached_party, epoch_record, fetch_public, key_digest, keys_on_every_core, now_s,
-                           pick, pick_value, pool, run_cli, sleep, write_client_config)
+                           cli_unreached_party, epoch_in_use, epoch_record, fetch_public, key_digest,
+                           keys_on_every_core, now_s, pick, pick_value, pool, run_cli, sleep, write_client_config)
 from helper_grpc import call_with_request_id, core_addresses
 from helper_properties import judge_source_decrypt
 
@@ -118,7 +118,8 @@ def public_key_digests(key_id):
 def check_source_epoch(key_id, source_epoch, details):
     """One public decryption of a fresh value under the source epoch, up to 2 attempts; an
     attempt that couldn't connect to a core is followed by one that leaves it out. Returns
-    False only on a wrong plaintext or malformed arguments."""
+    False only on a wrong plaintext or malformed arguments. Skipped (True) if the source epoch
+    is being destroyed or is gone."""
     data_type = pick(["ebool", "euint8", "euint16", "euint32", "euint64", "euint128"])
     value = pick_value(data_type)
     left_out = None
@@ -130,7 +131,11 @@ def check_source_epoch(key_id, source_epoch, details):
             args += ["--context-id", DEFAULT_CONTEXT_ID, "--epoch-id", source_epoch]
         if pick(["async", "async", "sync"]) == "sync":
             args.append("--sync")
-        rc, out = run_cli(args, timeout=300)
+        with epoch_in_use(source_epoch) as usable:
+            if not usable:
+                print(f"source epoch {source_epoch} was destroyed; no source epoch check", flush=True)
+                return True
+            rc, out = run_cli(args, timeout=300)
         verdict = judge_source_decrypt(rc, out, dict(details, check_data_type=data_type, check_value_hex=value,
                                                      check_left_out=left_out, check_attempt=attempt,
                                                      check_exit_code=rc))

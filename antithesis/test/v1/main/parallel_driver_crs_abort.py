@@ -3,11 +3,12 @@
 NOT_FOUND) and for unknown or malformed ones. Never while a reshare runs (lifecycle)."""
 import sys
 
-from helper_common import lifecycle, log_outcome, pick_count, pick_request_id, pool
+from helper_common import exit_unless_active, lifecycle, log_outcome, pick_count, pick_request_id, pool
 from helper_grpc import call_with_request_id, pick_core
 
 OP = "crs.abort"
 
+exit_unless_active(OP, "crs_abort", 60)
 ids = pool("crs")
 with lifecycle("generate", wait=120) as held:
     if not held:
