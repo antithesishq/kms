@@ -9,7 +9,7 @@ CRS generation at a time, and never while a reshare runs (lifecycle)."""
 import sys
 
 from helper_common import (chance, cli_outcome, enter_scratch_dir, exclusive, exit_unless_active, lifecycle,
-                           log_outcome, pick, pool, record, request_id_from, sleep, start_cli, wait_cli)
+                           log_outcome, paced, pick, pool, record, request_id_from, sleep, start_cli, wait_cli)
 from helper_grpc import call_with_request_id, core_addresses, pending_request_ids
 
 OP = "crs.abort"
@@ -17,7 +17,7 @@ MAX_RUNS = 3
 
 exit_unless_active(OP, "crs_abort_running", 60)
 with lifecycle("generate", wait=120) as held, exclusive("crs-generation") as alone:
-    if not (held and alone and len(pool("crs-abort-runs")) < MAX_RUNS):
+    if not (held and alone and paced(len(pool("crs-abort-runs")), MAX_RUNS, "crs_abort_runs")):
         log_outcome(OP, "skipped=busy_or_budget")
         sys.exit(0)
     insecure = chance(70)

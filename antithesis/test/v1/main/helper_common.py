@@ -110,10 +110,21 @@ def pick_decrypt_inputs():
             "no_precompute_sns": pick([False, False, False, True])}
 
 
+def paced(used, cap, name):
+    """Whether a per-container budget of cap slots, used of them spent, has room for one more.
+    How fast its slots open is a per-timeline choice: all at once, or one every 120 or 300 s
+    from the first time a command asked, so that Antithesis branches from later in a run still
+    have slots to spend. Seconds since boot, which clock faults don't move."""
+    pace = timeline_choice(f"pace_{name}", [0, 120, 300])
+    start = timeline_choice("budget_start", [now_s()])
+    opened = cap if pace == 0 else min(cap, 1 + (now_s() - start) // pace)
+    return used < opened
+
+
 def crs_request_allowed():
     """Whether a CRS driver may send a valid generation request now; if so, counts it. The
     caller holds exclusive("crs-generation"), so one is in flight at a time."""
-    if len(pool("crs")) >= MAX_CRS or len(pool("crs-requests")) >= MAX_CRS_REQUESTS:
+    if len(pool("crs")) >= MAX_CRS or not paced(len(pool("crs-requests")), MAX_CRS_REQUESTS, "crs_requests"):
         return False
     record("crs-requests", rand_hex(8))
     return True
@@ -240,6 +251,24 @@ def probe_key():
     preferred = [k for k in pool("first-key") if k in everywhere]
     candidates = preferred or everywhere
     return pick(candidates) if candidates else None
+
+
+def existing_keyset_args(uncompressed):
+    """Flags for a keygen that reuses an existing key's secret shares (UseExisting: party 1
+    rebuilds the key and re-shares it under the new ID), in a per-timeline share of keygens
+    (0, 20 or 50 %): a key every core holds, half the time keeping its tag, and for a
+    compressed keygen 3 times in 10 copying the result back over the existing key's public
+    material (--copy-compressed-key-to-original). [] otherwise."""
+    everywhere = set(keys_on_every_core())
+    keys = [k for k in pool("keys") if k in everywhere]
+    if not keys or not chance(timeline_choice("from_existing_pct", [0, 20, 50])):
+        return []
+    args = ["--existing-keyset-id", pick(keys)]
+    if chance(50):
+        args.append("--use-existing-key-tag")
+    if not uncompressed and chance(30):
+        args.append("--copy-compressed-key-to-original")
+    return args
 
 
 def pick_key():

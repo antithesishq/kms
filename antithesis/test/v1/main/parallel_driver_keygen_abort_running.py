@@ -13,15 +13,15 @@ them. Nothing here runs while a reshare does (helper_common.lifecycle)."""
 import sys
 
 from helper_common import (MAX_KEYS, chance, cli_outcome, enter_scratch_dir, exit_unless_active, key_count,
-                           lifecycle, log_outcome, pick, pool, record, request_id_from, sleep, start_cli, take,
-                           timeline_choice, wait_cli)
+                           lifecycle, log_outcome, paced, pick, pool, record, request_id_from, sleep, start_cli,
+                           take, timeline_choice, wait_cli)
 from helper_grpc import call_with_request_id, core_addresses
 
 MAX_RUNS = 12
 
 exit_unless_active("keygen.abort", "keygen_abort_running", 60)
 with lifecycle("generate", wait=120) as held:
-    room = held and len(pool("abort-runs")) < MAX_RUNS and key_count() < MAX_KEYS + 6
+    room = held and paced(len(pool("abort-runs")), MAX_RUNS, "abort_runs") and key_count() < MAX_KEYS + 6
     preproc_id = take("preproc") if room else None
     if preproc_id is None:
         log_outcome("keygen.abort", "skipped=no_preproc_or_budget_or_epoch_change")

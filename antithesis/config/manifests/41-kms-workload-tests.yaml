@@ -266,10 +266,21 @@ data:
                 "no_precompute_sns": pick([False, False, False, True])}
 
 
+    def paced(used, cap, name):
+        """Whether a per-container budget of cap slots, used of them spent, has room for one more.
+        How fast its slots open is a per-timeline choice: all at once, or one every 120 or 300 s
+        from the first time a command asked, so that Antithesis branches from later in a run still
+        have slots to spend. Seconds since boot, which clock faults don't move."""
+        pace = timeline_choice(f"pace_{name}", [0, 120, 300])
+        start = timeline_choice("budget_start", [now_s()])
+        opened = cap if pace == 0 else min(cap, 1 + (now_s() - start) // pace)
+        return used < opened
+
+
     def crs_request_allowed():
         """Whether a CRS driver may send a valid generation request now; if so, counts it. The
         caller holds exclusive("crs-generation"), so one is in flight at a time."""
-        if len(pool("crs")) >= MAX_CRS or len(pool("crs-requests")) >= MAX_CRS_REQUESTS:
+        if len(pool("crs")) >= MAX_CRS or not paced(len(pool("crs-requests")), MAX_CRS_REQUESTS, "crs_requests"):
             return False
         record("crs-requests", rand_hex(8))
         return True
@@ -396,6 +407,24 @@ data:
         preferred = [k for k in pool("first-key") if k in everywhere]
         candidates = preferred or everywhere
         return pick(candidates) if candidates else None
+
+
+    def existing_keyset_args(uncompressed):
+        """Flags for a keygen that reuses an existing key's secret shares (UseExisting: party 1
+        rebuilds the key and re-shares it under the new ID), in a per-timeline share of keygens
+        (0, 20 or 50 %): a key every core holds, half the time keeping its tag, and for a
+        compressed keygen 3 times in 10 copying the result back over the existing key's public
+        material (--copy-compressed-key-to-original). [] otherwise."""
+        everywhere = set(keys_on_every_core())
+        keys = [k for k in pool("keys") if k in everywhere]
+        if not keys or not chance(timeline_choice("from_existing_pct", [0, 20, 50])):
+            return []
+        args = ["--existing-keyset-id", pick(keys)]
+        if chance(50):
+            args.append("--use-existing-key-tag")
+        if not uncompressed and chance(30):
+            args.append("--copy-compressed-key-to-original")
+        return args
 
 
     def pick_key():
@@ -1317,6 +1346,16 @@ data:
     """What the reshare drivers need besides the reshare itself: the keys, source epoch and CRSes
     to reshare and the digests the request carries, every party's public-key digest, and the
     decryption under the source epoch afterwards. Not a command; Test Composer skips helper_ files.
+
+    parallel_driver_epoch_reshare.py reshares 1-2 keys every core holds into a fresh epoch, from the
+    kms-init epoch (re-signing 1-2 CRSes half the time) or from a confirmed reshared epoch, while
+    decryptions run. The CLI checks every core's result against the keys and their published
+    material; then Guarantee 3's checks run: each key's public key the same on every party before
+    and after, and the source epoch still decrypting. One new epoch at a time
+    (exclusive("new-epoch"), since each takes every core's CPU); no keygen, keygen abort or CRS
+    generation meanwhile (lifecycle "epoch", which also covers both public-key reads, since a keygen
+    with --copy-compressed-key-to-original replaces an existing key's public material); and the
+    source epoch is held against destruction (epoch_in_use).
     """
     import hashlib
 
@@ -1496,7 +1535,7 @@ data:
     import sys
 
     from helper_common import (chance, cli_outcome, enter_scratch_dir, exclusive, exit_unless_active, lifecycle,
-                               log_outcome, pick, pool, record, request_id_from, sleep, start_cli, wait_cli)
+                               log_outcome, paced, pick, pool, record, request_id_from, sleep, start_cli, wait_cli)
     from helper_grpc import call_with_request_id, core_addresses, pending_request_ids
 
     OP = "crs.abort"
@@ -1504,7 +1543,7 @@ data:
 
     exit_unless_active(OP, "crs_abort_running", 60)
     with lifecycle("generate", wait=120) as held, exclusive("crs-generation") as alone:
-        if not (held and alone and len(pool("crs-abort-runs")) < MAX_RUNS):
+        if not (held and alone and paced(len(pool("crs-abort-runs")), MAX_RUNS, "crs_abort_runs")):
             log_outcome(OP, "skipped=busy_or_budget")
             sys.exit(0)
         insecure = chance(70)
@@ -1623,13 +1662,14 @@ data:
     import sys
 
     from helper_common import (DEFAULT_CONTEXT_ID, DEFAULT_EPOCH_ID, chance, cli_outcome, enter_scratch_dir, exclusive,
-                               exit_unless_active, lifecycle, log_outcome, new_epoch_id, pick, pool, record, run_cli)
+                               exit_unless_active, lifecycle, log_outcome, new_epoch_id, paced, pick, pool, record,
+                               run_cli)
 
     OP = "epoch.create"
 
     exit_unless_active(OP, "epoch_create", 60)
     existing = pool("epochs-prss") + pool("epochs") + [DEFAULT_EPOCH_ID]
-    budget = len(pool("epochs-prss")) < 3 and len(pool("epochs-prss")) + len(pool("epochs-prss-made")) < 8
+    budget = len(pool("epochs-prss")) < 3 and paced(len(pool("epochs-prss-made")), 8, "prss_epochs")
     reuse = chance(10) or not budget
     enter_scratch_dir()
     with exclusive("new-epoch") as alone, lifecycle("epoch", wait=120 if alone else 0) as held:
@@ -1695,8 +1735,7 @@ data:
         log_outcome(OP, call_with_request_id(address, "GetEpochResult", pick_request_id(ids), timeout=30))
   parallel_driver_epoch_reshare.py: |
     #!/usr/bin/env python3
-    """Reshares 1-2 keys into a fresh epoch from the kms-init epoch (re-signing CRSes half the time)
-    or a reshared one, then runs Guarantee 3's checks. One new epoch at a time; no keygen meanwhile."""
+    """epoch.reshare with Guarantee 3's checks; what it reshares, and the locks, in helper_reshare.py."""
     import sys
 
     from helper_common import (DEFAULT_CONTEXT_ID, DEFAULT_EPOCH_ID, MAX_EPOCHS, cli_outcome, enter_scratch_dir,
@@ -1722,12 +1761,12 @@ data:
         log_outcome(OP, "skipped=key_material_unreadable")
         sys.exit(0)
     key_ids = [k for k, _ in keys]
-    before = {k: public_key_digests(k) for k in key_ids}
     with exclusive("new-epoch") as alone, epoch_in_use(source_epoch) as usable, \
             lifecycle("epoch", wait=300 if alone and usable else 0) as held:
         if not (alone and usable and held):
             log_outcome(OP, "skipped=epoch_busy_or_generation_running")
             sys.exit(0)
+        before = {k: public_key_digests(k) for k in key_ids}  # no keygen can change them meanwhile
         new_epoch = new_epoch_id()
         rc, out = run_cli(["--max-iter", 1200, "new-epoch", "--new-epoch-id", new_epoch, "--new-context-id",
                            DEFAULT_CONTEXT_ID, "--previous-epoch-params", previous], timeout=900)
@@ -1737,11 +1776,12 @@ data:
         outcome = judge_reshare(rc, out, details)
         if outcome != "done":
             wait_epoch_settled(new_epoch)
+        after = {k: public_key_digests(k) for k in key_ids}
     if outcome == "args":
         sys.exit(1)
     record("epochs", new_epoch, " ".join(key_ids + ["confirmed" if outcome == "done" else "unconfirmed"]))
     details["outcome"] = outcome
-    unchanged = [judge_public_key(before[k], public_key_digests(k), dict(details, key_id=k)) for k in key_ids]
+    unchanged = [judge_public_key(before[k], after[k], dict(details, key_id=k)) for k in key_ids]
     source_ok = check_source_epoch(pick(key_ids), source_epoch, details)
     sys.exit(0 if all(unchanged) and source_ok and outcome != "wrong" else 1)
   parallel_driver_epoch_reshare_rejected.py: |
@@ -1833,15 +1873,15 @@ data:
     import sys
 
     from helper_common import (MAX_KEYS, chance, cli_outcome, enter_scratch_dir, exit_unless_active, key_count,
-                               lifecycle, log_outcome, pick, pool, record, request_id_from, sleep, start_cli, take,
-                               timeline_choice, wait_cli)
+                               lifecycle, log_outcome, paced, pick, pool, record, request_id_from, sleep, start_cli,
+                               take, timeline_choice, wait_cli)
     from helper_grpc import call_with_request_id, core_addresses
 
     MAX_RUNS = 12
 
     exit_unless_active("keygen.abort", "keygen_abort_running", 60)
     with lifecycle("generate", wait=120) as held:
-        room = held and len(pool("abort-runs")) < MAX_RUNS and key_count() < MAX_KEYS + 6
+        room = held and paced(len(pool("abort-runs")), MAX_RUNS, "abort_runs") and key_count() < MAX_KEYS + 6
         preproc_id = take("preproc") if room else None
         if preproc_id is None:
             log_outcome("keygen.abort", "skipped=no_preproc_or_budget_or_epoch_change")
@@ -1879,14 +1919,16 @@ data:
   parallel_driver_keygen_start_insecure.py: |
     #!/usr/bin/env python3
     """Insecure key generation: InsecureKeyGen on every core, then its result, from a
-    preprocessing ID the preprocessing driver pooled; compressed (default) or uncompressed (-u).
+    preprocessing ID the preprocessing driver pooled; compressed (default) or uncompressed (-u),
+    and sometimes from an existing key's secret shares (existing_keyset_args; such keygens have
+    their own budget of 3 per container, since the key cap is spent within minutes).
 
     Keys add memory and boot time to every core, so once MAX_KEYS keys exist the driver sends
     only preprocessing IDs that can't start a keygen (already consumed, or unknown). So does it
     when the pool is empty. No keygen runs while a reshare does (helper_common.lifecycle)."""
-    from helper_common import (MAX_KEYS, chance, cli_outcome, enter_scratch_dir, exit_unless_active, key_count,
-                               lifecycle, log_outcome, pick, pick_count, pool, rand_hex, record, request_id_from, run_cli,
-                               take, timeline_choice)
+    from helper_common import (MAX_KEYS, chance, cli_outcome, enter_scratch_dir, existing_keyset_args, exit_unless_active,
+                               key_count, lifecycle, log_outcome, paced, pick, pick_count, pool, rand_hex, record,
+                               request_id_from, run_cli, take, timeline_choice)
 
     OP = "keygen.start_insecure"
 
@@ -1897,12 +1939,18 @@ data:
             if not held:
                 log_outcome(OP, "skipped=epoch_change_running")
                 continue
-            preproc_id = take("preproc") if key_count() < MAX_KEYS else None
-            if preproc_id is None:
-                preproc_id = pick(pool("preproc-taken") + [rand_hex(32)])
-            args = ["--max-iter", 600, "insecure-key-gen", "--preproc-id", preproc_id]
-            if chance(timeline_choice("uncompressed_pct", [0, 25, 75])):
-                args.append("-u")
+            uncompressed = chance(timeline_choice("uncompressed_pct", [0, 25, 75]))
+            existing = existing_keyset_args(uncompressed) if len(pool("existing-keygens")) < 3 else []
+            if existing:
+                preproc_id = take("preproc")
+            else:
+                preproc_id = take("preproc") if paced(key_count(), MAX_KEYS, "keys") else None
+            if preproc_id is None:  # a spent or unknown ID, which fails before the existing key matters
+                existing, preproc_id = [], pick(pool("preproc-taken") + [rand_hex(32)])
+            elif existing:
+                record("existing-keygens", preproc_id)
+            args = ["--max-iter", 600, "insecure-key-gen", "--preproc-id", preproc_id] + (["-u"] if uncompressed else [])
+            args += existing
             rc, out = run_cli(args, timeout=600)
             log_outcome(OP, cli_outcome(rc, out))
             if rc == 0 and request_id_from(out):

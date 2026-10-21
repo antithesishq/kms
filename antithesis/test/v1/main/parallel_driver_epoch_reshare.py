@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""Reshares 1-2 keys into a fresh epoch from the kms-init epoch (re-signing CRSes half the time)
-or a reshared one, then runs Guarantee 3's checks. One new epoch at a time; no keygen meanwhile."""
+"""epoch.reshare with Guarantee 3's checks; what it reshares, and the locks, in helper_reshare.py."""
 import sys
 
 from helper_common import (DEFAULT_CONTEXT_ID, DEFAULT_EPOCH_ID, MAX_EPOCHS, cli_outcome, enter_scratch_dir,
@@ -26,12 +25,12 @@ if previous is None:
     log_outcome(OP, "skipped=key_material_unreadable")
     sys.exit(0)
 key_ids = [k for k, _ in keys]
-before = {k: public_key_digests(k) for k in key_ids}
 with exclusive("new-epoch") as alone, epoch_in_use(source_epoch) as usable, \
         lifecycle("epoch", wait=300 if alone and usable else 0) as held:
     if not (alone and usable and held):
         log_outcome(OP, "skipped=epoch_busy_or_generation_running")
         sys.exit(0)
+    before = {k: public_key_digests(k) for k in key_ids}  # no keygen can change them meanwhile
     new_epoch = new_epoch_id()
     rc, out = run_cli(["--max-iter", 1200, "new-epoch", "--new-epoch-id", new_epoch, "--new-context-id",
                        DEFAULT_CONTEXT_ID, "--previous-epoch-params", previous], timeout=900)
@@ -41,10 +40,11 @@ with exclusive("new-epoch") as alone, epoch_in_use(source_epoch) as usable, \
     outcome = judge_reshare(rc, out, details)
     if outcome != "done":
         wait_epoch_settled(new_epoch)
+    after = {k: public_key_digests(k) for k in key_ids}
 if outcome == "args":
     sys.exit(1)
 record("epochs", new_epoch, " ".join(key_ids + ["confirmed" if outcome == "done" else "unconfirmed"]))
 details["outcome"] = outcome
-unchanged = [judge_public_key(before[k], public_key_digests(k), dict(details, key_id=k)) for k in key_ids]
+unchanged = [judge_public_key(before[k], after[k], dict(details, key_id=k)) for k in key_ids]
 source_ok = check_source_epoch(pick(key_ids), source_epoch, details)
 sys.exit(0 if all(unchanged) and source_ok and outcome != "wrong" else 1)

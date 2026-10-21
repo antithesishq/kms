@@ -1,6 +1,16 @@
 """What the reshare drivers need besides the reshare itself: the keys, source epoch and CRSes
 to reshare and the digests the request carries, every party's public-key digest, and the
 decryption under the source epoch afterwards. Not a command; Test Composer skips helper_ files.
+
+parallel_driver_epoch_reshare.py reshares 1-2 keys every core holds into a fresh epoch, from the
+kms-init epoch (re-signing 1-2 CRSes half the time) or from a confirmed reshared epoch, while
+decryptions run. The CLI checks every core's result against the keys and their published
+material; then Guarantee 3's checks run: each key's public key the same on every party before
+and after, and the source epoch still decrypting. One new epoch at a time
+(exclusive("new-epoch"), since each takes every core's CPU); no keygen, keygen abort or CRS
+generation meanwhile (lifecycle "epoch", which also covers both public-key reads, since a keygen
+with --copy-compressed-key-to-original replaces an existing key's public material); and the
+source epoch is held against destruction (epoch_in_use).
 """
 import hashlib
 

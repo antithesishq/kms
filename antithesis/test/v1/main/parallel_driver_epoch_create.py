@@ -7,13 +7,14 @@ shared with the reshare driver), and no keygen or CRS generation meanwhile (life
 import sys
 
 from helper_common import (DEFAULT_CONTEXT_ID, DEFAULT_EPOCH_ID, chance, cli_outcome, enter_scratch_dir, exclusive,
-                           exit_unless_active, lifecycle, log_outcome, new_epoch_id, pick, pool, record, run_cli)
+                           exit_unless_active, lifecycle, log_outcome, new_epoch_id, paced, pick, pool, record,
+                           run_cli)
 
 OP = "epoch.create"
 
 exit_unless_active(OP, "epoch_create", 60)
 existing = pool("epochs-prss") + pool("epochs") + [DEFAULT_EPOCH_ID]
-budget = len(pool("epochs-prss")) < 3 and len(pool("epochs-prss")) + len(pool("epochs-prss-made")) < 8
+budget = len(pool("epochs-prss")) < 3 and paced(len(pool("epochs-prss-made")), 8, "prss_epochs")
 reuse = chance(10) or not budget
 enter_scratch_dir()
 with exclusive("new-epoch") as alone, lifecycle("epoch", wait=120 if alone else 0) as held:
