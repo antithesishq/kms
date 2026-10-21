@@ -36,6 +36,7 @@ from [api-surface.md](api-surface.md). One row per local iteration and one per A
 | 27 | 2026-10-21 | iter16 (input review, candidate 5): keygen from an existing keyset (`--existing-keyset-id`, half the time `--use-existing-key-tag`, 3 in 10 compressed ones `--copy-compressed-key-to-original`), in a per-timeline share of keygens (0/20/50 %), with its own budget of 3 fresh preprocessing IDs per container. The reshare driver now reads the public keys inside its lifecycle lock: a copy-back replaces an existing key's public material, and outside the lock that could fail Guarantee 3's check on a correct system | 0, 1, 2, 3 | +436 lines over iter15 (16,398 / 3,191 merged; seeds 15,413–15,938): rebuilding a keyset from existing shares (`tfhe_internals/test_feature.rs` +278, `key_generator.rs` +101), `keyset_configuration.rs` | — | — | kept. 3 existing-keyset keygens in one seed: the compressed one succeeded, the two uncompressed ones ended `INTERNAL` as documented ("only supported for compressed keysets"). Checked by hand: all three flag combinations succeed, and after a copy-back, public and user decryptions under the original key still return the encrypted values. No false Always/Unreachable. Two earlier versions reached nothing: one sent the flags on spent preprocessing IDs (they fail first), one only on fresh ones within the key cap (too few) |
 | 28 | 2026-10-21 | — (Antithesis run of rows 25 and 27, commit `a34e1371`) | 0, 1, 2, 3 | — | `4d31ac7b71d37b2cf0e6f8e8ac0fb146-64-4` (60 min, turbo, default faults) | no coverage export (turbo) | validation before long runs. 83 properties pass. Failing: Guarantee 2's "public decryption answered by all four cores succeeds within 300 s…" (50) and its command's exit code, a suspected SUT finding, not caused by the workload (Status, 2026-10-21, stall after a core restart); the known container exits (exit 1: 1,836; exit 101: 26; init: 122). So rows 25 and 27 add no false positive |
 | 29 | 2026-10-21 | iter17 (input review, candidate 2): keygens and CRS generations in a PRSS-only or confirmed reshared epoch, in a per-timeline share (0/20/40 %; `generation_epoch`), with their own budgets (3 keygens, 2 insecure CRSes per container). Keys and CRSes record their home epoch; decryptions use a key's home as its default epoch, reshares start from it, existing-keyset keygens and CRS re-signing stay within one epoch, and the recovery check only uses keys born in the kms-init epoch (a key born in a destroyed epoch would otherwise fail Guarantee 2 on a correct system) | 0, 1, 2, 3 | +312 lines over iter16 (16,690 / 3,236 merged; seeds 15,001–16,434; seeds 4–6): key material stored under other epochs (`crypto_material/threshold.rs` +120), `key_generator.rs`, `epoch_manager.rs`, signing | — | — | kept. 7–9 completed keygens per seed, 2 valid CRS generations in other epochs in two seeds. No false Always/Unreachable. A first version (iter17a, seeds 1–3) shared the key and CRS budgets, which are spent before other epochs exist: only spent or invalid requests went to other epochs |
+| 30 | 2026-10-21 | — (Antithesis run of row 29, commit `2fe3d48a`) | 0, 1, 2, 3 | — | `d33556309d1fea4d9cba0efbf83769a3-64-4` (60 min, turbo, default faults) | no coverage export (turbo) | validation before long runs. 82 properties pass. Failing: both Guarantee 2 Always and the recovery command's exit code, each traced to the SUT, not the workload (Status, 2026-10-21: a key migration that splits a key's shares, and row 21's CRS-write brick, this time on the keygen path); the known container exits (exit 1, exit 101, init exit 1). So row 29 adds no false positive |
 
 ## How this workload differs from the skill's defaults
 
@@ -124,6 +125,46 @@ These were the user's instructions when the workload was started (2026-10-19):
 
 ## Status
 
+- 2026-10-21, SUT finding in `d3355630…` (Guarantee 2, decryption bound; high confidence): a
+  key migration (`copy_compressed_key_to_original`) leaves the parties with shares from
+  different re-sharings of the same key, so the key can never be decrypted again. Each
+  migration re-shares the existing secret (party 1 reconstructs it) and then, on each core
+  separately, replaces the original key's `FheKeyInfo` and `CompressedXofKeySet` with the new
+  ones (`key_gen_background`, `key_generator.rs:1713`; shared by `KeyGen` and
+  `InsecureKeyGen`). A core whose copy fails only logs "…committed successfully, but the
+  follow-up copy to original key id … failed … must be retried", and nothing reconciles the
+  cores. In the counterexample (input_hash 720574761797369932, vtime 1138.45) two migrations
+  of the probe key `af75…` ran (`5275…` and `b1d9…`, client commands at vtime 242 and 284):
+  core 1 copied the first and then failed the second ("Unencrypted load failed: streaming
+  error", a network fault); core 4 failed the first ("could not claim meta-store entry …
+  locked", the other migration held it) and copied the second; core 2 copied both; core 3
+  was stopped at vtime 400, mid-keygen, and copied neither. So the shares of `af75…` came from
+  three different sharings (1: first, 2 and 4: second, 3: original). With n=4, t=1, robust
+  open needs three consistent shares. After faults stopped, all four cores connected and
+  every decryption under `af75…` failed in `RobustOpen` for 300 s ("Gao decoding failure …
+  Could not reconstruct the sharing"; 0/4 responses). Either migration alone, with the same
+  faults, would have split the cores 2 to 2. No wrong plaintext can come out of this
+  (decoding fails rather than mis-decodes), but the key is lost to the protocol, and the
+  old shares are overwritten on three cores. The proto allows this: it doesn't forbid
+  concurrent migrations or describe partial failure. The same key decrypted fine at vtime
+  397, before the copies. This failure will dominate Guarantee 2 in timelines where it
+  happens: the probe key is the first key, which the existing-keyset keygen also picks.
+- 2026-10-21, the CRS-write brick of `43b32297…` (below) also hits keys. In `d3355630…`
+  (input_hash -4703883254626317498, vtime 1148.76) core 1 was killed (node stop, vtime 453.3)
+  while it stored key `6bdc…`: its `FheKeyInfo` write had started, its `PublicKey` write
+  hadn't logged. From then on every boot (15 starts) failed "storage verification failed:
+  missing or unreadable public material PublicKey for id=6bdc… Byte load failed", even
+  after faults stopped, and the recovery check never connected to party 1. Repair from
+  peers can't work in this deployment: `DEFAULT_MPC_CONTEXT` is rebuilt at every boot with
+  an empty `public_storage_url` for every node, by design ("We do not know the storage URLs
+  in the default context", `context_manager.rs:700`), so "Cannot access public storage of
+  peer N: no public storage URL recorded for this node". A context created with
+  `NewMpcContext` and real URLs would try the repair, which needs the harness's
+  `context.create` (blocked, see 2026-10-20).
+- 2026-10-21, platform note from `d3355630…`: in input_hash 720574761797369932 a node fault
+  (`node/stop` of kms-core-4, vtime 857.88) came 21 s after the fault injector paused for the
+  eventually phase (vtime 836.03). It didn't cause that failure (the key was already split),
+  and a restart that early fits Guarantee 2's bounds, but the quiet window isn't absolute.
 - 2026-10-21, SUT finding in turbo run `43b32297…` (Guarantee 2, connect bound): a pod kill
   during a CRS write leaves a core that can never boot again. Core 3 began storing insecure CRS
   `e9ec2c14…` at vtime 309.7 (`PRIV-p3/CrsInfo/08…01/e9ec…` written), was killed at 310.2,
