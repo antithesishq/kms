@@ -23,7 +23,7 @@ with lifecycle("generate", wait=120) as held, exclusive("crs-generation") as alo
         sys.exit(0)
     bits = pick_crs_bits(valid=alone and len(pool_matching("crs", "secure")) < MAX_SECURE_CRS
                          and crs_request_allowed())
-    rc, out = run_cli(["--max-iter", 1800, "crs-gen", "--max-num-bits", bits], timeout=900)
+    rc, out = run_cli(["--max-iter", 600, "crs-gen", "--max-num-bits", bits], timeout=300)
     log_outcome(OP, cli_outcome(rc, out))
     if rc == 0 and request_id_from(out):
         record("crs", request_id_from(out), "secure")

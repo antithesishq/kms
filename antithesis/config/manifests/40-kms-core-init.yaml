@@ -98,6 +98,9 @@ spec:
         - mountPath: /opt/antithesis/test/v1/main/parallel_driver_crs_abort.py
           subPath: parallel_driver_crs_abort.py
           name: workload-tests
+        - mountPath: /opt/antithesis/test/v1/main/parallel_driver_crs_abort_running.py
+          subPath: parallel_driver_crs_abort_running.py
+          name: workload-tests
         - mountPath: /opt/antithesis/test/v1/main/parallel_driver_crs_get_insecure_result.py
           subPath: parallel_driver_crs_get_insecure_result.py
           name: workload-tests

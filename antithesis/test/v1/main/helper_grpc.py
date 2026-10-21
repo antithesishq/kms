@@ -5,8 +5,8 @@ MetaStoreStatusService), and the ones it has always ask every core and verify th
 which a driver doesn't need.
 
 Requests are hand-encoded protobuf (pb_string, pb_varint): RequestId is message { string
-request_id = 1; }, Empty is no bytes. The response bytes are not decoded; only the status
-code matters to a driver.
+request_id = 1; }, Empty is no bytes. Responses are not decoded, except the request IDs a
+ListRequests response names (pending_request_ids).
 """
 import re
 
@@ -68,6 +68,54 @@ def call(address, path, payload, timeout):
             return "ok"
         except grpc.RpcError as e:
             return f"error={e.code().name}"
+
+
+def call_for_response(address, path, payload, timeout):
+    """Like call, but returns (outcome, response bytes or None)."""
+    with grpc.insecure_channel(address) as channel:
+        rpc = channel.unary_unary(path)
+        try:
+            return "ok", rpc(payload, timeout=timeout)
+        except grpc.RpcError as e:
+            return f"error={e.code().name}", None
+
+
+def read_varint(data, i):
+    n = shift = 0
+    while True:
+        b = data[i]
+        n |= (b & 0x7F) << shift
+        i, shift = i + 1, shift + 7
+        if not b & 0x80:
+            return n, i
+
+
+def fields(data):
+    """(field number, wire type, value) of a protobuf message; value is an int or bytes."""
+    i = 0
+    while i < len(data):
+        key, i = read_varint(data, i)
+        wire = key & 7
+        if wire == 0:
+            value, i = read_varint(data, i)
+        elif wire == 2:
+            size, i = read_varint(data, i)
+            value, i = data[i:i + size], i + size
+        else:
+            return  # no other wire types in these messages
+        yield key >> 3, wire, value
+
+
+def pending_request_ids(address, store, timeout=20):
+    """IDs of the requests in a meta store (MetaStoreType, e.g. 4 = CRS_GENERATION) that the
+    core at address reports as PROCESSING: ListRequestsResponse { repeated RequestStatusInfo
+    requests = 1; }, RequestStatusInfo { string request_id = 1; ... }."""
+    outcome, resp = call_for_response(address, METASTORE_SERVICE + "ListRequests",
+                                      pb_varint(1, store) + pb_varint(2, 0), timeout)
+    if resp is None:
+        return []
+    return [v2.decode() for f, w, v in fields(resp) if f == 1 and w == 2
+            for f2, w2, v2 in fields(v) if f2 == 1 and w2 == 2]
 
 
 def call_with_request_id(address, method, request_id, timeout):
