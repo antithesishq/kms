@@ -40,7 +40,8 @@ DEFAULT_EPOCH_ID = "08" + "0" * 61 + "1"
 # which is harmless. One directory per pool, one file per ID:
 #   preproc/<id>        insecure preprocessing IDs not yet given to a keygen
 #   preproc-taken/<id>  preprocessing IDs a keygen driver took
-#   keys/<key_id>       keys this container generated; the file holds the preprocessing ID
+#   keys/<key_id>       keys this container generated; the file holds the preprocessing ID and,
+#                       for a key generated in another epoch than kms-init's, that epoch
 #   first-key/<key_id>  the key first_generate_key.py generated, before faults started
 #   pubdec/<id>, userdec/<id>  request IDs of decryptions the CLI completed
 #   epochs/<epoch_id>   epochs a reshare created; the file holds the reshared key IDs and then
@@ -51,7 +52,8 @@ DEFAULT_EPOCH_ID = "08" + "0" * 61 + "1"
 #   epochs-destroyed/<epoch_id> epochs parallel_driver_epoch_destroy.py took out of the pools
 #   epoch-locks/<epoch_id>      flock files: shared while a command decrypts or reshares under
 #                               the epoch, exclusive while it is destroyed (epoch_in_use)
-#   crs/<crs_id>        CRSes the CLI generated; the file holds "secure" or "insecure"
+#   crs/<crs_id>        CRSes the CLI generated; the file holds "secure" or "insecure" and, for
+#                       one generated in another epoch than kms-init's, that epoch
 #   crs-requests/<n>    one file per valid CRS generation request sent
 #   abort-runs/<id>     preprocessing IDs parallel_driver_keygen_abort_running.py used (its budget)
 #   profile/<name>      this timeline's draw of a workload knob (timeline_choice)
@@ -193,19 +195,6 @@ def pool(name):
         return []
 
 
-def pool_matching(name, content):
-    """The items of pool name whose file holds content."""
-    found = []
-    for item in pool(name):
-        try:
-            with open(f"{STATE_DIR}/{name}/{item}") as f:
-                if f.read() == content:
-                    found.append(item)
-        except FileNotFoundError:
-            pass
-    return found
-
-
 def take(name):
     """Move one random ID from pool name to name-taken and return it, or None if empty."""
     os.makedirs(f"{STATE_DIR}/{name}-taken", exist_ok=True)
@@ -243,24 +232,63 @@ def keys_on_every_core():
     return sorted(everywhere)
 
 
+def key_home(key_id):
+    """The epoch key_id was generated in: the second word of keys/<key_id>, else the kms-init
+    epoch (keys generated there, and keys this container didn't generate)."""
+    try:
+        with open(f"{STATE_DIR}/keys/{key_id}") as f:
+            words = f.read().split()
+    except FileNotFoundError:
+        return DEFAULT_EPOCH_ID
+    return words[1] if len(words) > 1 else DEFAULT_EPOCH_ID
+
+
+def crs_record(crs_id):
+    """(kind, epoch) of a generated CRS: "secure" or "insecure", and the epoch it was generated
+    in (the kms-init epoch unless crs/<crs_id> names another)."""
+    try:
+        with open(f"{STATE_DIR}/crs/{crs_id}") as f:
+            words = f.read().split()
+    except FileNotFoundError:
+        return None, DEFAULT_EPOCH_ID
+    return (words[0] if words else None), (words[1] if len(words) > 1 else DEFAULT_EPOCH_ID)
+
+
+def epoch_alive(epoch_id):
+    """Whether an epoch is the kms-init one or one the workload made and hasn't destroyed."""
+    return epoch_id == DEFAULT_EPOCH_ID or any(
+        os.path.exists(f"{STATE_DIR}/{p}/{epoch_id}") for p in ("epochs", "epochs-prss"))
+
+
+def generation_epoch():
+    """The epoch a keygen or CRS generation runs in: the kms-init epoch, or in a per-timeline
+    share of them (0, 20 or 40 %) a PRSS-only epoch or a confirmed reshared one. A key or CRS
+    born there lives only there and in epochs reshared from it (key_home, crs_record)."""
+    targets = pool("epochs-prss") + [e for e in pool("epochs") if epoch_record(e)[1] == "confirmed"]
+    if targets and chance(timeline_choice("other_epoch_pct", [0, 20, 40])):
+        return pick(targets)
+    return DEFAULT_EPOCH_ID
+
+
 def probe_key():
-    """A key every core holds, for a check that needs all four cores to decrypt, preferring
-    the one first_generate_key.py made before faults started. None if no such key can be
-    confirmed."""
-    everywhere = keys_on_every_core()
+    """A key every core holds in the kms-init epoch, for a check that decrypts under it with
+    all four cores, preferring the one first_generate_key.py made before faults started. None
+    if no such key can be confirmed."""
+    everywhere = [k for k in keys_on_every_core() if key_home(k) == DEFAULT_EPOCH_ID]
     preferred = [k for k in pool("first-key") if k in everywhere]
     candidates = preferred or everywhere
     return pick(candidates) if candidates else None
 
 
-def existing_keyset_args(uncompressed):
+def existing_keyset_args(uncompressed, epoch_id=DEFAULT_EPOCH_ID):
     """Flags for a keygen that reuses an existing key's secret shares (UseExisting: party 1
     rebuilds the key and re-shares it under the new ID), in a per-timeline share of keygens
     (0, 20 or 50 %): a key every core holds, half the time keeping its tag, and for a
     compressed keygen 3 times in 10 copying the result back over the existing key's public
-    material (--copy-compressed-key-to-original). [] otherwise."""
+    material (--copy-compressed-key-to-original). The existing key must live in epoch_id, the
+    keygen's epoch, where the cores read it. [] otherwise."""
     everywhere = set(keys_on_every_core())
-    keys = [k for k in pool("keys") if k in everywhere]
+    keys = [k for k in pool("keys") if k in everywhere and key_home(k) == epoch_id]
     if not keys or not chance(timeline_choice("from_existing_pct", [0, 20, 50])):
         return []
     args = ["--existing-keyset-id", pick(keys)]
@@ -274,8 +302,9 @@ def existing_keyset_args(uncompressed):
 def pick_key():
     """A key to decrypt under: one this container generated, else one party 1 published.
     Nine times in ten only a key every core holds, when there is one: a decryption under a
-    key some cores lack waits out the MPC timeout (300 s) and gives no verdict."""
-    keys = pool("keys") or published_keys()
+    key some cores lack waits out the MPC timeout (300 s) and gives no verdict. Never a key
+    whose epoch was destroyed, when there is another."""
+    keys = [k for k in pool("keys") if epoch_alive(key_home(k))] or pool("keys") or published_keys()
     if chance(90):
         everywhere = keys_on_every_core()
         keys = [k for k in keys if k in everywhere] or everywhere or keys
@@ -332,14 +361,14 @@ def epochs_of(key_id, status):
 
 
 def pick_epoch(key_id):
-    """(epoch ID, status) to decrypt under key_id: the kms-init epoch ("default"), a confirmed
-    reshared epoch or an unconfirmed one, in a mix drawn per timeline (2:2:1, mostly default,
-    or mostly reshared), falling back to the default when there is no reshared epoch of the
-    chosen kind."""
+    """(epoch ID, status) to decrypt under key_id: the epoch the key was generated in
+    ("default": key_home, usually the kms-init epoch), a confirmed reshared epoch or an
+    unconfirmed one, in a mix drawn per timeline (2:2:1, mostly default, or mostly reshared),
+    falling back to the default when there is no reshared epoch of the chosen kind."""
     mix = {0: [2, 2, 1], 1: [8, 1, 1], 2: [1, 3, 2]}[timeline_choice("epoch_mix", [0, 1, 2])]
     status = pick(["default"] * mix[0] + ["confirmed"] * mix[1] + ["unconfirmed"] * mix[2])
     epochs = epochs_of(key_id, status) if status != "default" else []
-    return (pick(epochs), status) if epochs else (DEFAULT_EPOCH_ID, "default")
+    return (pick(epochs), status) if epochs else (key_home(key_id), "default")
 
 
 def fetch_public(path):
@@ -418,7 +447,7 @@ def epoch_in_use(epoch_id):
             yield False
             return
         try:
-            yield os.path.exists(f"{STATE_DIR}/epochs/{epoch_id}")
+            yield epoch_alive(epoch_id)
         finally:
             fcntl.flock(f, fcntl.LOCK_UN)
 

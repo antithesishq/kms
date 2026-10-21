@@ -7,8 +7,9 @@ in 10, and whenever another CRS generation is in flight or the CRS budget is spe
 runs (lifecycle)."""
 import sys
 
-from helper_common import (cli_outcome, crs_request_allowed, enter_scratch_dir, exclusive, exit_unless_active,
-                           lifecycle, log_outcome, pick_crs_bits, record, request_id_from, run_cli)
+from helper_common import (DEFAULT_EPOCH_ID, cli_outcome, crs_request_allowed, enter_scratch_dir, exclusive,
+                           exit_unless_active, generation_epoch, lifecycle, log_outcome, pick_crs_bits, pool, rand_hex,
+                           record, request_id_from, run_cli)
 
 OP = "crs.start_insecure"
 
@@ -18,8 +19,13 @@ with lifecycle("generate", wait=120) as held, exclusive("crs-generation") as alo
     if not held:
         log_outcome(OP, "skipped=epoch_change_running")
         sys.exit(0)
-    bits = pick_crs_bits(valid=alone and crs_request_allowed())
-    rc, out = run_cli(["--max-iter", 600, "insecure-crs-gen", "--max-num-bits", bits], timeout=600)
+    epoch = generation_epoch()
+    elsewhere = alone and epoch != DEFAULT_EPOCH_ID and len(pool("other-epoch-crs")) < 2  # own budget
+    if elsewhere:
+        record("other-epoch-crs", rand_hex(8))
+    bits = pick_crs_bits(valid=elsewhere or (alone and crs_request_allowed()))
+    rc, out = run_cli(["--max-iter", 600, "insecure-crs-gen", "--max-num-bits", bits]
+                      + (["--epoch-id", epoch] if epoch != DEFAULT_EPOCH_ID else []), timeout=600)
     log_outcome(OP, cli_outcome(rc, out))
     if rc == 0 and request_id_from(out):
-        record("crs", request_id_from(out), "insecure")
+        record("crs", request_id_from(out), "insecure" if epoch == DEFAULT_EPOCH_ID else f"insecure {epoch}")

@@ -15,8 +15,9 @@ source epoch is held against destruction (epoch_in_use).
 import hashlib
 
 from helper_common import (DEFAULT_CONTEXT_ID, DEFAULT_EPOCH_ID, STATE_DIR, chance, cli_connected,
-                           cli_unreached_party, epoch_in_use, epoch_record, fetch_public, key_digest,
-                           keys_on_every_core, now_s, pick, pick_value, pool, run_cli, sleep, write_client_config)
+                           cli_unreached_party, crs_record, epoch_alive, epoch_in_use, epoch_record, fetch_public,
+                           key_digest, key_home, keys_on_every_core, now_s, pick, pick_value, pool, run_cli, sleep,
+                           write_client_config)
 from helper_grpc import call_with_request_id, core_addresses
 from helper_properties import judge_source_decrypt
 
@@ -30,7 +31,7 @@ def reshare_candidates():
         if key_id in everywhere:
             try:
                 with open(f"{STATE_DIR}/keys/{key_id}") as f:
-                    preproc_id = f.read().strip()
+                    preproc_id = (f.read().split() or [""])[0]
             except FileNotFoundError:
                 continue
             if preproc_id:
@@ -47,12 +48,16 @@ def pick_reshare_key():
 
 def plan_reshare():
     """([(key ID, preprocessing ID)], source epoch) for a reshare, or None: one key, or two 1
-    time in 3, from the kms-init epoch, or half the time from a confirmed reshared epoch (then
-    among that epoch's keys, which it holds)."""
+    time in 3, from the epoch they were generated in (key_home; one still alive), or half the
+    time from a confirmed reshared epoch (then among that epoch's keys, which it holds)."""
     candidates = reshare_candidates()
     chained = [e for e in pool("epochs") if epoch_record(e)[1] == "confirmed"
                and all(k in candidates for k in epoch_record(e)[0])]
-    source, keys = DEFAULT_EPOCH_ID, sorted(candidates)
+    homes = sorted({key_home(k) for k in candidates if epoch_alive(key_home(k))})
+    if not homes:
+        return None
+    source = pick(homes)
+    keys = sorted(k for k in candidates if key_home(k) == source)
     if chained and chance(50):
         source = pick(chained)
         keys = epoch_record(source)[0]
@@ -66,7 +71,7 @@ def pick_crs_to_resign():
     """[(CRS ID, digest)] of 1 or 2 CRSes from crs/ to re-sign in a reshare from the kms-init
     epoch, which holds them, half the time, or []. The digest is SHAKE-256/32 of the PDAT_CRS
     domain separator and party 1's CRS object (DSEP_PUBDATA_CRS in core/service/src/engine/base.rs)."""
-    crs_ids = pool("crs")
+    crs_ids = [c for c in pool("crs") if crs_record(c)[1] == DEFAULT_EPOCH_ID]
     if not crs_ids or not chance(50):
         return []
     chosen = []
