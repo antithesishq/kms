@@ -7,6 +7,7 @@ pub mod small_execution {
     pub mod malicious_prss;
 }
 pub mod large_execution {
+    pub mod fuzzed_vss;
     pub mod malicious_coinflip;
     pub mod malicious_local_double_share;
     pub mod malicious_local_single_share;

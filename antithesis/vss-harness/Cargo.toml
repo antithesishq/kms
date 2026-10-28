@@ -1,0 +1,26 @@
+[package]
+name = "kms-antithesis-vss"
+description = "Antithesis harness that runs VSS with all parties in one process and fuzzed malicious parties."
+version.workspace = true
+edition.workspace = true
+publish = false
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "vss-harness"
+path = "src/main.rs"
+
+[dependencies]
+algebra.workspace = true
+antithesis_sdk.workspace = true
+anyhow.workspace = true
+itertools.workspace = true
+num-integer.workspace = true
+rand.workspace = true
+serde_json.workspace = true
+threshold-execution = { workspace = true, features = ["malicious_strategies", "vss_observer"] }
+threshold-types.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "sync"] }
+tracing.workspace = true
+tracing-subscriber.workspace = true

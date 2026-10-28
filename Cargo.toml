@@ -19,6 +19,7 @@ members = [
     "observability",
     "tools/kms-health-check",
     "tools/generate-test-material",
+    "antithesis/vss-harness",
 ]
 
 # The backward-compatibility modules are excluded from the workspace to avoid dependency conflicts.
@@ -123,6 +124,11 @@ alloy-sol-types = "=1.7.1"  # Solidity types & EIP-712 - LOW RISK: Alloy/Paradig
 # Its build script downloads a C header from the antithesis-sdk-cpp GitHub repository.
 # LOW RISK: Antithesis (the testing platform vendor), MIT, about 20 lines of code that forward coverage callbacks.
 antithesis-instrumentation = "=0.1.0"
+# Antithesis SDK: assertions, lifecycle signals and fuzzer-controlled randomness. Used only by the
+# Antithesis VSS harness (antithesis/vss-harness), never by a KMS binary.
+# LOW RISK: Antithesis (the testing platform vendor), MIT; its deps are rand 0.8 (already in the tree),
+# serde_json, libloading, linkme, once_cell and rustc_version_runtime.
+antithesis_sdk = "=0.3.0"
 anyhow = "=1.0.104"  # Error handling - MEDIUM RISK: Reputable individual maintainer (dtolnay), 410M downloads
 assert_cmd = "=2.2.2"  # Assert command for testing - LOW RISK: assert-rs team, 1M+ downloads
 async-trait = "=0.1.92"  # Async trait support -  MEDIUM RISK: Reputable individual maintainer (dtolnay), 292M downloads

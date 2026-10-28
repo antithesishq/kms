@@ -1,0 +1,30 @@
+# The VSS harness: one pod that runs every VSS party in one process, with
+# fuzzed malicious parties. The harness sends setup_complete itself and then
+# runs VSS sessions until Antithesis ends the run. See
+# ../../feature-workloads/vss/analysis.md.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vss-harness
+  namespace: kms-vss
+  labels:
+    app: vss-harness
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vss-harness
+  template:
+    metadata:
+      labels:
+        app: vss-harness
+    spec:
+      containers:
+      - name: vss-harness
+        image: us-central1-docker.pkg.dev/molten-verve-216720/zama-repository/kms/vss-harness:@VSS_TAG@
+        imagePullPolicy: Never
+        env:
+        - name: VSS_LOG
+          value: error
+        - name: VSS_ROUND_TIMEOUT_MS
+          value: "3000"

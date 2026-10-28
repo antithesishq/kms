@@ -88,9 +88,10 @@ pub trait Vss: Send + Sync + Clone + ProtocolDescription {
 /// Alias that represents the list of challenges sent by a party during VSS
 /// such that list[j][k] correspond to the challenges for the kth secret in the batch
 /// where P_j is the VSS sender
-type ChallengesList<Z> = Vec<Vec<Z>>;
+pub(crate) type ChallengesList<Z> = Vec<Vec<Z>>;
 pub(crate) type VerificationValues<Z> = Vec<Vec<(Z, Z)>>;
-type ResultRound1<Z> = Result<(Role, Result<ExchangedDataRound1<Z>, anyhow::Error>), Elapsed>;
+pub(crate) type ResultRound1<Z> =
+    Result<(Role, Result<ExchangedDataRound1<Z>, anyhow::Error>), Elapsed>;
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Hash, Debug)]
 pub enum ValueOrPoly<Z>
@@ -130,8 +131,8 @@ pub struct ExchangedDataRound1<Z>
 where
     Poly<Z>: Eq,
 {
-    double_poly_list: Vec<DoublePoly<Z>>,
-    challenges_list: ChallengesList<Z>,
+    pub(crate) double_poly_list: Vec<DoublePoly<Z>>,
+    pub(crate) challenges_list: ChallengesList<Z>,
 }
 
 impl<Z: Ring> ExchangedDataRound1<Z> {
@@ -154,9 +155,9 @@ impl<Z: Ring> ExchangedDataRound1<Z> {
 ///This data structure is indexed by [party_idx, idx_vss]
 #[derive(Clone, Debug)]
 pub struct Round1VSSOutput<Z: Ring> {
-    sent_challenges: Vec<ChallengesList<Z>>,
-    received_vss: Vec<ExchangedDataRound1<Z>>,
-    my_poly: Vec<BivariatePoly<Z>>,
+    pub(crate) sent_challenges: Vec<ChallengesList<Z>>,
+    pub(crate) received_vss: Vec<ExchangedDataRound1<Z>>,
+    pub(crate) my_poly: Vec<BivariatePoly<Z>>,
 }
 
 ///Simply send the trivial sharing P: X -> secret (P constant polynomial)
@@ -528,13 +529,18 @@ pub(crate) async fn round_2<
         casted_bcast_data.insert(*corrupted_role, None);
     }
 
+    #[cfg(feature = "vss_observer")]
+    super::vss_observer::emit(session, || super::vss_observer::VssEvent::Round2 {
+        corrupt: session.corrupt_roles().clone(),
+    });
+
     Ok(casted_bcast_data)
 }
 
 /// Verifies consistency of the data broadcast in round 2 of VSS
 /// by checking that the data has the expected type and lengths.
 /// Returns None if the check fails.
-fn verify_round_2_broadcast<Z: Ring>(
+pub(crate) fn verify_round_2_broadcast<Z: Ring>(
     role: Role,
     broadcast_value: BroadcastValue<Z>,
     num_parties: usize,
@@ -637,6 +643,13 @@ pub(crate) async fn round_3<
         }
     }
 
+    #[cfg(feature = "vss_observer")]
+    super::vss_observer::emit(session, || super::vss_observer::VssEvent::Round3 {
+        potentially_unhappy: potentially_unhappy.clone(),
+        unhappy: unhappy_vec.clone(),
+        corrupt: session.corrupt_roles().clone(),
+    });
+
     Ok(unhappy_vec)
 }
 
@@ -715,6 +728,8 @@ pub(crate) async fn round_4<
     //we use an auxiliary result variable to insert the result in order and not rely on the arbitrary order of keys()
     let num_parties = session.num_parties();
     let mut result: Vec<Vec<Z>> = vec![vec![Z::ZERO; num_secrets]; num_parties];
+    #[cfg(feature = "vss_observer")]
+    let mut repaired_from = std::collections::BTreeSet::new();
     session
         .roles()
         .iter()
@@ -739,6 +754,8 @@ pub(crate) async fn round_4<
 
             if let Some(p) = maybe_eval {
                 result[role_sender] = p;
+                #[cfg(feature = "vss_observer")]
+                repaired_from.insert(*role_sender);
             //Else, use the value received in the first round
             } else {
                 result[role_sender] = vss.received_vss[role_sender]
@@ -748,6 +765,13 @@ pub(crate) async fn round_4<
                     .collect_vec();
             }
         });
+
+    #[cfg(feature = "vss_observer")]
+    super::vss_observer::emit(session, || super::vss_observer::VssEvent::Round4 {
+        corrupt: session.corrupt_roles().clone(),
+        repaired_from,
+    });
+
     Ok(result)
 }
 
@@ -772,7 +796,7 @@ async fn vss_receive_round_1<Z: Ring, S: BaseSessionHandles>(
 
 /// Compute a_{i,j} and b_{i,j} for the num_secrets secrets shared by
 /// Pk indexed by dealer_index, for Pj indexed by party_idx
-fn generate_verification_value<Z>(
+pub(crate) fn generate_verification_value<Z>(
     num_secrets: usize,
     my_role: &Role,
     party_role: &Role,
@@ -804,7 +828,7 @@ where
     Ok(out)
 }
 
-fn find_potential_conflicts_for_all_roles<Z: Ring>(
+pub(crate) fn find_potential_conflicts_for_all_roles<Z: Ring>(
     verification_map: &HashMap<Role, Option<Vec<VerificationValues<Z>>>>,
     all_roles: &[Role],
 ) -> HashSet<(Role, Role, Role)> {
@@ -907,7 +931,7 @@ fn find_potential_conflicts_received_challenges<Z: Ring>(
         })
 }
 
-fn answer_to_potential_conflicts<Z>(
+pub(crate) fn answer_to_potential_conflicts<Z>(
     potentially_unhappy: &HashSet<(Role, Role, Role)>,
     own_role: &Role,
     vss: &Round1VSSOutput<Z>,
@@ -966,7 +990,7 @@ where
 /// Loop through potential unhappy, retrieve the corresponding three dispute settlement values and decide who to add in the unhappy set
 /// Returns a vector of unhappy sets (one for each VSS sender) as well as a set of malicious which have been found to be broadcasting
 /// something unexpected (either wrong type, or wrong length)
-fn find_real_conflicts<Z: Ring>(
+pub(crate) fn find_real_conflicts<Z: Ring>(
     num_secrets: usize,
     potentially_unhappy: &HashSet<(Role, Role, Role)>,
     bcast_settlements: HashMap<Role, BroadcastValue<Z>>,
@@ -1037,7 +1061,7 @@ fn find_real_conflicts<Z: Ring>(
     (unhappy_vec, malicious_bcast)
 }
 
-fn round_4_conflict_resolution<Z: RingWithExceptionalSequence>(
+pub(crate) fn round_4_conflict_resolution<Z: RingWithExceptionalSequence>(
     msg: &mut BTreeMap<(Role, Role), ValueOrPoly<Z>>,
     is_dealer: bool,
     dealer_role: Role,
@@ -1068,7 +1092,7 @@ fn round_4_conflict_resolution<Z: RingWithExceptionalSequence>(
     Ok(())
 }
 
-fn round_4_fix_conflicts<Z: RingWithExceptionalSequence, S: BaseSessionHandles>(
+pub(crate) fn round_4_fix_conflicts<Z: RingWithExceptionalSequence, S: BaseSessionHandles>(
     session: &mut S,
     num_secrets: usize,
     dealer_role: Role,
@@ -1119,6 +1143,12 @@ fn round_4_fix_conflicts<Z: RingWithExceptionalSequence, S: BaseSessionHandles>(
             })
             .collect();
 
+        #[cfg(feature = "vss_observer")]
+        let voters: std::collections::BTreeSet<Role> =
+            non_dealer_happy_values.keys().copied().collect();
+        #[cfg(feature = "vss_observer")]
+        let mut yes_voters = std::collections::BTreeSet::new();
+
         // Starting at 1 cause the dealer always votes for itself
         // as we do not explicitly broadcast both F_i(X) (from dealer)
         // and G_j(alpha_i) for P_j == dealer (thus from dealer too)
@@ -1166,12 +1196,23 @@ fn round_4_fix_conflicts<Z: RingWithExceptionalSequence, S: BaseSessionHandles>(
                     });
                 if all_equals {
                     votes_for_dealer += 1;
+                    #[cfg(feature = "vss_observer")]
+                    yes_voters.insert(role_pj);
                 }
             }
         }
         if votes_for_dealer <= 2 * threshold {
             session.add_corrupt(dealer_role);
         }
+
+        #[cfg(feature = "vss_observer")]
+        super::vss_observer::emit(session, || super::vss_observer::VssEvent::Round4Vote {
+            dealer: dealer_role,
+            unhappy_party: *role_pi,
+            voters,
+            yes_voters,
+            dealer_thrown_out: votes_for_dealer <= 2 * threshold,
+        });
     }
 
     // Also add all those who have sent garbage during broadcast

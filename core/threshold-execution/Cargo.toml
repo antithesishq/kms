@@ -76,3 +76,6 @@ non-wasm = [
 testing = ["non-wasm", "dep:tokio", "dep:futures-util", "dep:futures", "dep:test-utils", "dep:tempfile"]
 slow_tests = ["testing"]
 malicious_strategies = ["testing"]
+# Reports the sets each party computes during VSS to an observer (large_execution::vss_observer).
+# Used by the Antithesis VSS harness to compare the views of all parties.
+vss_observer = ["non-wasm"]

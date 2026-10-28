@@ -105,3 +105,32 @@ kubectl apply -f config/manifests/41-kms-workload-tests.yaml
 kubectl delete pod -n kms-threshold-staging kms-core-client-0
 make test
 ```
+
+## VSS harness
+
+`vss-harness/` is a second, separate workload. It runs the VSS protocol with all parties in one process and up to t fuzzed liars.
+`feature-workloads/vss/analysis.md` lists its decision points, properties and findings.
+It needs two edits outside this folder: the `vss_observer` feature of `threshold-execution`, and the liar in `malicious_execution/large_execution/fuzzed_vss.rs`.
+
+| Target | Does |
+|---|---|
+| `vss-build` | Builds the instrumented `vss-harness` image, tagged like `build`, and records the tag in `build/vss-tag` |
+| `vss-push` | Pushes that image to the Antithesis registry |
+| `vss-config` | Renders `config-vss/` into `build/config-vss/` with that tag |
+
+Run it locally without Antithesis:
+
+```
+VSS_ITERATIONS=40 VSS_SEED=7 cargo run -p kms-antithesis-vss
+```
+
+The run prints the reach claims that were not reached and the property violations, and exits non-zero on a violation.
+
+Launch it from this folder, after `make vss-build vss-push vss-config`.
+`snouty launch` pushes only the config image, so the harness image must be in the registry first:
+
+```
+snouty launch -w basic_k8s_test --config build/config-vss \
+  --test-name kms-vss --description "VSS harness" --duration 30 \
+  --param custom.pause_fault_injector=true
+```

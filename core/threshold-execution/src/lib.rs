@@ -39,6 +39,8 @@ pub mod large_execution {
     pub mod share_dispute;
     pub mod single_sharing;
     pub mod vss;
+    #[cfg(feature = "vss_observer")]
+    pub mod vss_observer;
 }
 
 #[cfg(feature = "non-wasm")]

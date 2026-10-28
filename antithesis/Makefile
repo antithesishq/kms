@@ -1,7 +1,7 @@
 # Run from this directory (make <target>) or from the repo root (make -C antithesis <target>).
 HERE := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
-.PHONY: build push config driver k3s load up down test
+.PHONY: build push config driver k3s load up down test vss-build vss-push vss-config
 
 # Build the four KMS images into the local image store, tagged with the git
 # commit (see images/build.sh).
@@ -42,3 +42,15 @@ down:
 # Run the test commands in the client pod: keygen, driver, reshare, driver.
 test:
 	$(HERE)local/test.sh
+
+# Build the VSS harness image, tagged like build (see images/build-vss.sh).
+vss-build:
+	$(HERE)images/build-vss.sh
+
+# Push the last VSS harness build to the Antithesis registry.
+vss-push:
+	$(HERE)images/push-vss.sh
+
+# Render config-vss/ into build/config-vss/ with the tag of the last vss-build.
+vss-config:
+	$(HERE)config-vss/render.sh

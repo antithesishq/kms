@@ -949,4 +949,83 @@ mod tests {
         >(params, strategy)
         .await;
     }
+
+    /// Party 1 broadcasts `A`, but controls who sees its echo and its votes: party 2 alone gets
+    /// its echo, party 3 alone gets its first vote, and party 4 gets neither. Parties 2 and 3
+    /// then count n - t votes for `A`, while party 4 counts only the two honest votes.
+    #[tokio::test]
+    #[ignore = "fails: a sender that delivers its echo and votes to some parties only splits the honest outputs"]
+    async fn selective_echo_and_votes_do_not_split_the_honest_outputs() {
+        use crate::communication::p2p::send_to_parties;
+        use algebra::structure_traits::FromU128;
+
+        type Z = ResiduePolyF4Z128;
+        let roles = generate_fixed_roles(4);
+        let runtime = DistributedTestRuntime::<Z, Role, { Z::EXTENSION_DEGREE }>::new(
+            roles.clone(),
+            1,
+            NetworkMode::Sync,
+            None,
+        );
+        let session_id = SessionId::from(0x5e1ec7);
+        let liar = Role::indexed_from_one(1);
+        let honest_roles = [2, 3, 4].map(Role::indexed_from_one);
+        let [p2, p3, p4] = honest_roles;
+        let value_a = BroadcastValue::RingValue(Z::from_u128(1));
+        let value_b = BroadcastValue::RingValue(Z::from_u128(2));
+        let vote_a = || {
+            NetworkValue::<Z>::VoteBatch(HashMap::from([(liar, value_a.to_bcast_hash().unwrap())]))
+        };
+
+        let mut honest = tokio::task::JoinSet::new();
+        for role in honest_roles {
+            let mut session = runtime.base_session_for_party(session_id, role, None);
+            honest.spawn(async move {
+                let value = BroadcastValue::RingValue(Z::from_u128(10 + role.one_based() as u128));
+                let out = SyncReliableBroadcast::default()
+                    .broadcast_from_all(&mut session, value)
+                    .await
+                    .unwrap();
+                (role, out)
+            });
+        }
+
+        let session = runtime.base_session_for_party(session_id, liar, None);
+        // Send round: A to parties 2 and 3, B to party 4.
+        let rounds: [HashMap<Role, NetworkValue<Z>>; 4] = [
+            HashMap::from([
+                (p2, NetworkValue::Send(value_a.clone())),
+                (p3, NetworkValue::Send(value_a.clone())),
+                (p4, NetworkValue::Send(value_b)),
+            ]),
+            // Echo round: party 2 alone gets an echo of A. The others get an echo batch without
+            // party 1's value, so they keep listening to party 1.
+            HashMap::from([
+                (
+                    p2,
+                    NetworkValue::EchoBatch(HashMap::from([(liar, value_a.clone())])),
+                ),
+                (p3, NetworkValue::EchoBatch(HashMap::new())),
+                (p4, NetworkValue::EchoBatch(HashMap::new())),
+            ]),
+            // First vote round: party 3 alone gets a vote for A.
+            HashMap::from([
+                (p2, NetworkValue::Empty),
+                (p3, vote_a()),
+                (p4, NetworkValue::Empty),
+            ]),
+            // Last vote round: parties 2 and 3 get a vote for A.
+            HashMap::from([(p2, vote_a()), (p3, vote_a()), (p4, NetworkValue::Empty)]),
+        ];
+        for msgs in rounds.iter() {
+            send_to_parties(msgs, &session).await.unwrap();
+        }
+
+        let outputs: HashMap<Role, RoleValueMap<Z>> = honest.join_all().await.into_iter().collect();
+        let views = honest_roles.map(|role| outputs[&role][&liar].clone());
+        assert!(
+            views.iter().all_equal(),
+            "the honest outputs for party 1 differ: {views:?}"
+        );
+    }
 }

@@ -1,0 +1,5 @@
+# Antithesis ships only the `default` namespace, so the manifests create their own.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kms-vss
